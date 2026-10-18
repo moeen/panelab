@@ -1,0 +1,117 @@
+{
+  "name": "panelab",
+  "productName": "PaneLab",
+  "version": "0.1.0",
+  "description": "Compare websites side by side in real Chromium, WebKit, and Firefox on macOS",
+  "license": "MIT",
+  "author": "Moein Nemati",
+  "homepage": "https://github.com/moeen/panelab#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moeen/panelab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moeen/panelab/issues"
+  },
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "bin": {
+    "panelab": "bin/panelab.js"
+  },
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "pnpm typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.tests.json",
+    "check": "biome check .",
+    "format": "biome check --write .",
+    "browsers:install": "playwright install chromium webkit firefox",
+    "icons:generate": "node scripts/generate-icons.ts",
+    "test": "pnpm test:fast && pnpm build && playwright test --project=runtime-chromium --project=runtime-webkit --project=runtime-firefox --project=electron",
+    "test:fast": "vitest run",
+    "test:unit": "vitest run --project=unit",
+    "test:renderer": "vitest run --project=renderer",
+    "test:integration": "playwright test --project=runtime-chromium --project=runtime-webkit --project=runtime-firefox",
+    "test:e2e": "pnpm build && playwright test --project=electron",
+    "test:native": "pnpm build && PANELAB_NATIVE_TESTS=1 playwright test --project=native",
+    "test:watch": "vitest --project=unit",
+    "test:coverage": "vitest run --coverage",
+    "mcp": "node out/main/cli.js mcp",
+    "dist": "pnpm build && electron-builder --mac --arm64 --publish never"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "pixelmatch": "8.0.0",
+    "playwright": "1.64.1",
+    "pngjs": "7.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@biomejs/biome": "2.5.15",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/browser-playwright": "5.0.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "@xyflow/react": "^12.12.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "lucide-react": "^1.59.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "5.0.5",
+    "vitest-browser-react": "2.3.0"
+  },
+  "build": {
+    "appId": "dev.panelab.app",
+    "productName": "PaneLab",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**",
+      "skills/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/playwright/**",
+      "node_modules/playwright-core/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "resources/panelab.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "minimumSystemVersion": "15.0"
+    },
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "electronLanguages": [
+      "en"
+    ]
+  }
+}

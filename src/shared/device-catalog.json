@@ -1,0 +1,1203 @@
+{
+  "version": 1,
+  "researchedAt": "2026-10-14",
+  "selection": {
+    "targetCoveragePercent": 90,
+    "verifiedCoveragePercent": null,
+    "region": "Worldwide",
+    "trafficPeriod": "2026-09",
+    "basis": "Compact screen-size families, common Apple/Samsung/Pixel models, and current MacBook/iPad display sizes. Equivalent geometry shares searchable aliases. Manufacturer specifications verify native pixels; Playwright supplies browser identities and Android CSS scaling.",
+    "limitation": "Public resolution traffic and model sales do not establish 90% installed-device or website-traffic coverage. This is a representative catalog, not a measured coverage claim.",
+    "sources": [
+      "https://gs.statcounter.com/screen-resolution-stats/mobile/worldwide",
+      "https://gs.statcounter.com/screen-resolution-stats/desktop/worldwide",
+      "https://counterpointresearch.com/en/insights/iphone-17-global-best-selling-smartphone-in-q2-2026"
+    ]
+  },
+  "geometry": {
+    "units": "Viewport and screen are CSS pixels. nativeResolution is manufacturer panel pixels; it is not used as a Playwright viewport.",
+    "viewportPolicy": "Full logical screen without browser chrome. Native display pixels can differ from CSS size × DPR because of OS scaling and rounding.",
+    "orientation": "Mobile landscape profiles are derived by swapping dimensions and are hidden from the library."
+  },
+  "profiles": [
+    {
+      "id": "iPhone 17",
+      "name": "iPhone 17 / 17 Pro",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 402,
+        "height": 874
+      },
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "nativeResolution": {
+        "width": 1206,
+        "height": 2622
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 17",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone 16 Pro", "iPhone 17 Pro"],
+      "listed": true
+    },
+    {
+      "id": "iPhone 17 Pro Max",
+      "name": "iPhone 17 Pro Max",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 440,
+        "height": 956
+      },
+      "screen": {
+        "width": 440,
+        "height": 956
+      },
+      "nativeResolution": {
+        "width": 1320,
+        "height": 2868
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 17 Pro Max",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone 16 Pro Max"],
+      "listed": true
+    },
+    {
+      "id": "iPhone 16",
+      "name": "iPhone 15 / 16",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 393,
+        "height": 852
+      },
+      "screen": {
+        "width": 393,
+        "height": 852
+      },
+      "nativeResolution": {
+        "width": 1179,
+        "height": 2556
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 16",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone 15", "iPhone 15 Pro", "iPhone 14 Pro"],
+      "listed": true
+    },
+    {
+      "id": "iPhone 16 Plus",
+      "name": "iPhone 15 / 16 Plus",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "screen": {
+        "width": 430,
+        "height": 932
+      },
+      "nativeResolution": {
+        "width": 1290,
+        "height": 2796
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 16 Plus",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone 15 Plus", "iPhone 14 Pro Max", "iPhone 15 Pro Max"],
+      "listed": true
+    },
+    {
+      "id": "iPhone 13",
+      "name": "iPhone 13 / 14",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screen": {
+        "width": 390,
+        "height": 844
+      },
+      "nativeResolution": {
+        "width": 1170,
+        "height": 2532
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 13",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [
+        "iPhone 12",
+        "iPhone 12 Pro",
+        "iPhone 13 Pro",
+        "iPhone 14",
+        "iPhone 16e",
+        "iPhone 17e"
+      ],
+      "listed": true
+    },
+    {
+      "id": "iPhone 13 Pro Max",
+      "name": "iPhone 13 Pro Max / 14 Plus",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 428,
+        "height": 926
+      },
+      "screen": {
+        "width": 428,
+        "height": 926
+      },
+      "nativeResolution": {
+        "width": 1284,
+        "height": 2778
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 13 Pro Max",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone 12 Pro Max", "iPhone 14 Plus"],
+      "listed": true
+    },
+    {
+      "id": "iPhone 11",
+      "name": "iPhone 11 / XR",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 414,
+        "height": 896
+      },
+      "screen": {
+        "width": 414,
+        "height": 896
+      },
+      "nativeResolution": {
+        "width": 828,
+        "height": 1792
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone XR"],
+      "listed": true
+    },
+    {
+      "id": "iPhone SE (3rd gen)",
+      "name": "iPhone SE (3rd gen)",
+      "group": "Phones",
+      "os": "ios",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "screen": {
+        "width": 375,
+        "height": 667
+      },
+      "nativeResolution": {
+        "width": 750,
+        "height": 1334
+      },
+      "displayMode": "Full logical screen; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPhone SE (3rd gen)",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://developer.apple.com/design/human-interface-guidelines/layout",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPhone SE (2nd gen)", "iPhone 8"],
+      "listed": true
+    },
+    {
+      "id": "Pixel 9",
+      "name": "Pixel 9",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 360,
+        "height": 808
+      },
+      "screen": {
+        "width": 360,
+        "height": 808
+      },
+      "nativeResolution": {
+        "width": 1080,
+        "height": 2424
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Android display scaling can vary.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 9",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.google.com/pixelphone/answer/7158570?hl=en",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "Pixel 9 Pro",
+      "name": "Pixel 9 Pro",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 427,
+        "height": 952
+      },
+      "screen": {
+        "width": 427,
+        "height": 952
+      },
+      "nativeResolution": {
+        "width": 1280,
+        "height": 2856
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Android display scaling can vary.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 9 Pro",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.google.com/pixelphone/answer/7158570?hl=en",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "Pixel 9 Pro XL",
+      "name": "Pixel 9 Pro XL",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 448,
+        "height": 997
+      },
+      "screen": {
+        "width": 448,
+        "height": 997
+      },
+      "nativeResolution": {
+        "width": 1344,
+        "height": 2992
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Android display scaling can vary.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 9 Pro XL",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.google.com/pixelphone/answer/7158570?hl=en",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["Pixel 8 Pro"],
+      "listed": true
+    },
+    {
+      "id": "Pixel 7",
+      "name": "Pixel 6 / 7 / 8",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 412,
+        "height": 915
+      },
+      "screen": {
+        "width": 412,
+        "height": 915
+      },
+      "nativeResolution": {
+        "width": 1080,
+        "height": 2400
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Android display scaling can vary.",
+      "deviceScaleFactor": 2.625,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 7",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.google.com/pixelphone/answer/7158570?hl=en",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["Pixel 6", "Pixel 6a", "Pixel 7a", "Pixel 8", "Pixel 8a"],
+      "listed": true
+    },
+    {
+      "id": "Galaxy S24",
+      "name": "Galaxy S24",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "screen": {
+        "width": 360,
+        "height": 780
+      },
+      "nativeResolution": {
+        "width": 1080,
+        "height": 2340
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Samsung screen zoom can vary.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Galaxy S24",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://www.samsung.com/ae/support/mobile-devices/what-are-the-sizes-and-the-resolution-of-the-new-s24-series/",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "Galaxy A55",
+      "name": "Galaxy A55",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 480,
+        "height": 1040
+      },
+      "screen": {
+        "width": 480,
+        "height": 1040
+      },
+      "nativeResolution": {
+        "width": 1080,
+        "height": 2340
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Samsung screen zoom can vary.",
+      "deviceScaleFactor": 2.25,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Galaxy A55",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://www.samsung.com/uk/smartphones/galaxy-a/galaxy-a55-5g-awesome-iceblue-128gb-sm-a556blbaeub/",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "android-360-800",
+      "name": "Android · 360 × 800",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      },
+      "screen": {
+        "width": 360,
+        "height": 800
+      },
+      "nativeResolution": null,
+      "displayMode": "Common worldwide CSS screen size, September 2026; representative Android identity and 3× DPR, not a named hardware model.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 7",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/mobile/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "android-384-832",
+      "name": "Android · 384 × 832",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 384,
+        "height": 832
+      },
+      "screen": {
+        "width": 384,
+        "height": 832
+      },
+      "nativeResolution": null,
+      "displayMode": "Common worldwide CSS screen size, September 2026; representative Android identity and 3× DPR, not a named hardware model.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 7",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/mobile/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "android-393-873",
+      "name": "Android · 393 × 873",
+      "group": "Phones",
+      "os": "android",
+      "viewport": {
+        "width": 393,
+        "height": 873
+      },
+      "screen": {
+        "width": 393,
+        "height": 873
+      },
+      "nativeResolution": null,
+      "displayMode": "Common worldwide CSS screen size, September 2026; representative Android identity and 3× DPR, not a named hardware model.",
+      "deviceScaleFactor": 3,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Pixel 7",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/mobile/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "ipad-pro-11-m4",
+      "name": "iPad Pro 11″ (M4)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 834,
+        "height": 1210
+      },
+      "screen": {
+        "width": 834,
+        "height": 1210
+      },
+      "nativeResolution": {
+        "width": 1668,
+        "height": 2420
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/119892",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "ipad-pro-13-m4",
+      "name": "iPad Pro 13″ (M4)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 1032,
+        "height": 1376
+      },
+      "screen": {
+        "width": 1032,
+        "height": 1376
+      },
+      "nativeResolution": {
+        "width": 2064,
+        "height": 2752
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/119891",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "ipad-air-11-m3",
+      "name": "iPad Air 11″ (M3)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 820,
+        "height": 1180
+      },
+      "screen": {
+        "width": 820,
+        "height": 1180
+      },
+      "nativeResolution": {
+        "width": 1640,
+        "height": 2360
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/122241",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPad Air 11 (M2)"],
+      "listed": true
+    },
+    {
+      "id": "ipad-air-13-m3",
+      "name": "iPad Air 13″ (M3)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 1024,
+        "height": 1366
+      },
+      "screen": {
+        "width": 1024,
+        "height": 1366
+      },
+      "nativeResolution": {
+        "width": 2048,
+        "height": 2732
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/122242",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPad Air 13 (M2)", "iPad Pro 12.9"],
+      "listed": true
+    },
+    {
+      "id": "ipad-mini-a17",
+      "name": "iPad mini (A17 Pro)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 744,
+        "height": 1133
+      },
+      "screen": {
+        "width": 744,
+        "height": 1133
+      },
+      "nativeResolution": {
+        "width": 1488,
+        "height": 2266
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/121456",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPad mini 6"],
+      "listed": true
+    },
+    {
+      "id": "ipad-a16",
+      "name": "iPad (A16)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 820,
+        "height": 1180
+      },
+      "screen": {
+        "width": 820,
+        "height": 1180
+      },
+      "nativeResolution": {
+        "width": 1640,
+        "height": 2360
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/122240",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPad 10th generation"],
+      "listed": true
+    },
+    {
+      "id": "ipad-9",
+      "name": "iPad (9th gen)",
+      "group": "Tablets",
+      "os": "ios",
+      "viewport": {
+        "width": 810,
+        "height": 1080
+      },
+      "screen": {
+        "width": 810,
+        "height": 1080
+      },
+      "nativeResolution": {
+        "width": 1620,
+        "height": 2160
+      },
+      "displayMode": "Full logical screen at Retina 2×; browser and system chrome are not simulated.",
+      "deviceScaleFactor": 2,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "webkit",
+      "descriptor": "iPad Pro 11",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://support.apple.com/en-us/111898",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": ["iPad 7th generation", "iPad 8th generation"],
+      "listed": true
+    },
+    {
+      "id": "Galaxy Tab S9",
+      "name": "Galaxy Tab S9",
+      "group": "Tablets",
+      "os": "android",
+      "viewport": {
+        "width": 640,
+        "height": 1024
+      },
+      "screen": {
+        "width": 640,
+        "height": 1024
+      },
+      "nativeResolution": {
+        "width": 1600,
+        "height": 2560
+      },
+      "displayMode": "Playwright logical screen at the descriptor DPR; Android display scaling can vary.",
+      "deviceScaleFactor": 2.5,
+      "isMobile": true,
+      "hasTouch": true,
+      "orientation": "portrait",
+      "defaultEngine": "chromium",
+      "descriptor": "Galaxy Tab S9",
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": [
+        "https://www.samsung.com/hk_en/tablets/galaxy-tab-s/galaxy-tab-s9-5g-graphite-256gb-sm-x716bzaetgy/",
+        "https://github.com/microsoft/playwright/blob/v1.64.0/packages/playwright-core/src/server/deviceDescriptorsSource.json"
+      ],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "macbook-air-13",
+      "name": "MacBook Air 13.6″",
+      "group": "Laptops",
+      "os": "macos",
+      "viewport": {
+        "width": 1280,
+        "height": 832
+      },
+      "screen": {
+        "width": 1280,
+        "height": 832
+      },
+      "nativeResolution": {
+        "width": 2560,
+        "height": 1664
+      },
+      "displayMode": "Retina 2× full-screen preset (native panel ÷ 2), not a claim about the default macOS scaled desktop or browser window.",
+      "deviceScaleFactor": 2,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://support.apple.com/en-us/122209"],
+      "aliases": ["MacBook Air M2", "MacBook Air M3", "MacBook Air M4"],
+      "listed": true
+    },
+    {
+      "id": "macbook-air-15",
+      "name": "MacBook Air 15.3″",
+      "group": "Laptops",
+      "os": "macos",
+      "viewport": {
+        "width": 1440,
+        "height": 932
+      },
+      "screen": {
+        "width": 1440,
+        "height": 932
+      },
+      "nativeResolution": {
+        "width": 2880,
+        "height": 1864
+      },
+      "displayMode": "Retina 2× full-screen preset (native panel ÷ 2), not a claim about the default macOS scaled desktop or browser window.",
+      "deviceScaleFactor": 2,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://support.apple.com/en-us/122210"],
+      "aliases": ["MacBook Air 15 M2", "MacBook Air 15 M3", "MacBook Air 15 M4"],
+      "listed": true
+    },
+    {
+      "id": "macbook-pro-14",
+      "name": "MacBook Pro 14.2″",
+      "group": "Laptops",
+      "os": "macos",
+      "viewport": {
+        "width": 1512,
+        "height": 982
+      },
+      "screen": {
+        "width": 1512,
+        "height": 982
+      },
+      "nativeResolution": {
+        "width": 3024,
+        "height": 1964
+      },
+      "displayMode": "Retina 2× full-screen preset (native panel ÷ 2), not a claim about the default macOS scaled desktop or browser window.",
+      "deviceScaleFactor": 2,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://support.apple.com/en-us/121552"],
+      "aliases": ["MacBook Pro M1 Pro", "MacBook Pro M2 Pro", "MacBook Pro M3", "MacBook Pro M4"],
+      "listed": true
+    },
+    {
+      "id": "macbook-pro-16",
+      "name": "MacBook Pro 16.2″",
+      "group": "Laptops",
+      "os": "macos",
+      "viewport": {
+        "width": 1728,
+        "height": 1117
+      },
+      "screen": {
+        "width": 1728,
+        "height": 1117
+      },
+      "nativeResolution": {
+        "width": 3456,
+        "height": 2234
+      },
+      "displayMode": "Retina 2× full-screen preset (native panel ÷ 2), not a claim about the default macOS scaled desktop or browser window.",
+      "deviceScaleFactor": 2,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://support.apple.com/en-us/121554"],
+      "aliases": [
+        "MacBook Pro 16 M1 Pro",
+        "MacBook Pro 16 M2 Pro",
+        "MacBook Pro 16 M3 Pro",
+        "MacBook Pro 16 M4 Pro"
+      ],
+      "listed": true
+    },
+    {
+      "id": "mac-laptop",
+      "name": "MacBook Air 13.3″ (M1)",
+      "group": "Laptops",
+      "os": "macos",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "screen": {
+        "width": 1280,
+        "height": 800
+      },
+      "nativeResolution": {
+        "width": 2560,
+        "height": 1600
+      },
+      "displayMode": "Retina 2× full-screen preset (native panel ÷ 2), not a claim about the default macOS scaled desktop or browser window.",
+      "deviceScaleFactor": 2,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://support.apple.com/en-us/111883"],
+      "aliases": ["MacBook Air M1"],
+      "listed": true
+    },
+    {
+      "id": "desktop-1366",
+      "name": "Desktop · 1366 × 768",
+      "group": "Desktops",
+      "os": "macos",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "screen": {
+        "width": 1366,
+        "height": 768
+      },
+      "nativeResolution": null,
+      "displayMode": "Representative desktop CSS screen, 1× DPR and macOS browser identity; not a named physical display.",
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/desktop/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "desktop-1536",
+      "name": "Desktop · 1536 × 864",
+      "group": "Desktops",
+      "os": "macos",
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "screen": {
+        "width": 1536,
+        "height": 864
+      },
+      "nativeResolution": null,
+      "displayMode": "Representative desktop CSS screen, 1× DPR and macOS browser identity; not a named physical display.",
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/desktop/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "mac-desktop",
+      "name": "Desktop · 1920 × 1080",
+      "group": "Desktops",
+      "os": "macos",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "screen": {
+        "width": 1920,
+        "height": 1080
+      },
+      "nativeResolution": null,
+      "displayMode": "Representative desktop CSS screen, 1× DPR and macOS browser identity; not a named physical display.",
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/desktop/worldwide"],
+      "aliases": [],
+      "listed": true
+    },
+    {
+      "id": "mac-wide",
+      "name": "Desktop · 2560 × 1440",
+      "group": "Desktops",
+      "os": "macos",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "screen": {
+        "width": 2560,
+        "height": 1440
+      },
+      "nativeResolution": null,
+      "displayMode": "Representative desktop CSS screen, 1× DPR and macOS browser identity; not a named physical display.",
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "orientation": "landscape",
+      "defaultEngine": "chromium",
+      "descriptor": null,
+      "custom": false,
+      "identities": {
+        "chromium": null,
+        "webkit": null
+      },
+      "sources": ["https://gs.statcounter.com/screen-resolution-stats/desktop/worldwide"],
+      "aliases": [],
+      "listed": true
+    }
+  ]
+}

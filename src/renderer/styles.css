@@ -1,0 +1,418 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/base.css";
+
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --color-destructive: var(--destructive);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", Menlo, monospace;
+}
+:root {
+  --background: #ffffff;
+  --foreground: #222630;
+  --muted: #f4f5f7;
+  --muted-foreground: #606774;
+  --primary: #0964d7;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf0f8;
+  --accent: #edf0f4;
+  --border: #d9dde5;
+  --destructive: #c6333a;
+  --rail: #eff1f5;
+  --workspace: #e5e8ee;
+  --preview-ground: #f2f3f5;
+  color-scheme: light;
+}
+:root.dark {
+  --background: #20232a;
+  --foreground: #e6e9ef;
+  --muted: #292d36;
+  --muted-foreground: #a5adba;
+  --primary: #6ba6ff;
+  --primary-foreground: #101827;
+  --secondary: #303b50;
+  --accent: #30353f;
+  --border: #3b414c;
+  --destructive: #ff7b83;
+  --rail: #1c1f26;
+  --workspace: #15181e;
+  --preview-ground: #292d34;
+  color-scheme: dark;
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    @apply h-full w-full overflow-hidden;
+  }
+  body {
+    @apply m-0 bg-background font-sans text-sm text-foreground antialiased;
+  }
+  button,
+  select,
+  summary {
+    -webkit-user-select: none;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-default;
+  }
+  ::selection {
+    @apply bg-primary/25;
+  }
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+  *:focus-visible {
+    outline-offset: 3px;
+  }
+  ::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-muted-foreground/35;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+}
+@layer components {
+  .app-shell {
+    @apply flex h-full flex-col;
+  }
+  .app-titlebar {
+    @apply flex h-12 shrink-0 items-center border-b border-border/60 pl-24 pr-4;
+    background: var(--rail);
+    -webkit-app-region: drag;
+  }
+  .app-titlebar button,
+  .app-titlebar input,
+  .app-titlebar select {
+    -webkit-app-region: no-drag;
+  }
+  .toolbar {
+    @apply flex h-14 shrink-0 items-center gap-3 border-b px-4;
+  }
+  .app-body {
+    @apply flex min-h-0 flex-1;
+  }
+  .sidebar {
+    @apply flex w-60 shrink-0 flex-col border-r;
+    background: var(--rail);
+  }
+  .library {
+    @apply min-h-0 flex-1 overflow-y-auto px-2 pb-4;
+  }
+  .library-row {
+    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent;
+  }
+  .library-group {
+    @apply mb-1 mt-5 px-2.5 text-xs font-semibold text-muted-foreground;
+  }
+  .workspace-area {
+    @apply relative flex min-h-0 min-w-0 flex-1 flex-col;
+    background: var(--workspace);
+  }
+  .canvas-area {
+    @apply relative min-h-0 flex-1;
+  }
+  .canvas-toolbar {
+    @apply flex items-center gap-0.5 rounded-lg bg-background p-1;
+    outline: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+  }
+  .pane-tile {
+    @apply flex min-w-0 flex-col overflow-hidden rounded-xl bg-background;
+    outline: 1px solid var(--border);
+    outline-offset: -1px;
+    container-type: inline-size;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.06),
+      0 6px 20px rgb(0 0 0 / 0.06);
+  }
+  .react-flow__node.dragging .pane-tile {
+    box-shadow:
+      0 2px 4px rgb(0 0 0 / 0.08),
+      0 16px 40px rgb(0 0 0 / 0.16);
+  }
+  .pane-tile.selected {
+    outline: 2px solid var(--primary);
+    outline-offset: -1px;
+  }
+  .pane-header {
+    @apply flex h-14 shrink-0 cursor-grab items-center gap-1.5 px-2.5;
+  }
+  .react-flow__node.dragging .pane-header {
+    @apply cursor-grabbing;
+  }
+  .pane-header button {
+    cursor: default;
+  }
+  .pane-drag-handle {
+    @apply -ml-1 flex h-8 w-3 shrink-0 cursor-grab items-center justify-center;
+  }
+  .pane-content {
+    @apply relative shrink-0 overflow-hidden;
+    background: var(--preview-ground);
+  }
+  .preview-stage {
+    @apply absolute inset-0 flex items-center justify-center overflow-hidden;
+  }
+  .preview-canvas {
+    @apply block touch-none outline-none;
+  }
+  .preview-input {
+    @apply absolute left-1 top-1 h-px w-px resize-none border-0 p-0 opacity-0 outline-none;
+  }
+  .pane-empty {
+    @apply absolute inset-0 flex flex-col items-center justify-center;
+  }
+  .pane-loading {
+    @apply pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-background px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm;
+  }
+  .pane-footer {
+    @apply flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-[10px] text-muted-foreground;
+  }
+  .status-dot {
+    @apply size-1.5 shrink-0 rounded-full bg-muted-foreground/55;
+  }
+  .status-dot.ready {
+    @apply bg-emerald-600 dark:bg-emerald-400;
+  }
+  .status-dot.error {
+    @apply bg-destructive;
+  }
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium;
+  }
+  .identity-list {
+    @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-1;
+  }
+  .identity-list dt {
+    @apply text-muted-foreground;
+  }
+  .identity-list dd {
+    @apply m-0 break-all font-mono;
+  }
+  .inspector {
+    @apply flex h-72 min-h-40 max-h-[60vh] shrink-0 flex-col border-t bg-background;
+    resize: vertical;
+    overflow: hidden;
+  }
+  .inspector-tabs {
+    @apply flex h-10 shrink-0 items-center gap-1 border-b px-3;
+  }
+  .diagnostic-row {
+    @apply border-b border-border/50 px-4 py-2 text-xs;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 36px;
+  }
+  .footer-bar {
+    @apply flex h-7 shrink-0 items-center justify-between gap-3 border-t px-4 text-[10px] text-muted-foreground;
+    background: var(--rail);
+  }
+  .toast {
+    @apply fixed bottom-10 left-1/2 z-50 flex max-w-[min(600px,90vw)] -translate-x-1/2 items-center gap-3 rounded-lg bg-foreground px-4 py-3 text-xs text-background shadow-[0_6px_24px_rgb(0_0_0/0.2)];
+  }
+}
+/* Inspection: website overlays use DevTools box-model tints so the regions read as conventions, not chrome. */
+:root {
+  --box-margin: rgb(246 178 107 / 0.5);
+  --box-border: rgb(255 214 120 / 0.55);
+  --box-padding: rgb(147 196 125 / 0.5);
+  --box-content: rgb(111 168 220 / 0.5);
+  --warning-ink: oklch(55.5% 0.163 48.998);
+  --warning-tint: oklch(82.8% 0.189 84.429 / 0.16);
+}
+:root.dark {
+  --warning-ink: oklch(82.8% 0.189 84.429);
+  --warning-tint: oklch(82.8% 0.189 84.429 / 0.12);
+}
+@layer components {
+  .inspect-overlay {
+    @apply pointer-events-none absolute inset-0 overflow-hidden;
+  }
+  .inspect-overlay svg {
+    @apply absolute inset-0 size-full;
+  }
+  .inspect-label {
+    @apply absolute z-10 max-w-[90%] truncate rounded px-1.5 py-0.5 font-mono text-[10px] leading-4 tabular-nums;
+    background: var(--foreground);
+    color: var(--background);
+  }
+  .inspect-label.target {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .inspect-edge {
+    @apply pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium shadow-sm;
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .inspect-status {
+    @apply absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-background px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm;
+  }
+  .preview-canvas.picking {
+    cursor: crosshair;
+  }
+  .pane-chip {
+    @apply shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-secondary;
+  }
+  .inspector-tab-strip {
+    @apply flex min-w-0 items-center gap-1 overflow-x-auto;
+    scrollbar-width: none;
+  }
+  .tree-row {
+    @apply flex h-6 cursor-default items-center gap-1 whitespace-nowrap pr-3 font-mono text-[11px] outline-none hover:bg-accent;
+  }
+  .tree-row[aria-selected="true"] {
+    @apply bg-secondary;
+  }
+  .tree-row:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--primary);
+  }
+  .section-title {
+    @apply flex items-center gap-2 px-3 pb-1.5 pt-3 text-[11px] font-semibold text-muted-foreground;
+  }
+  .box-model {
+    @apply relative mx-3 rounded-sm border border-dashed p-1 text-center font-mono text-[10px] tabular-nums;
+  }
+  .box-model > span {
+    @apply absolute left-1.5 top-0.5 font-sans text-[9px] text-foreground/70;
+  }
+  .declaration {
+    @apply flex min-h-6 items-baseline gap-1 px-3 py-0.5 font-mono text-[11px] leading-5;
+  }
+  .compare-table {
+    @apply w-max min-w-full border-separate border-spacing-0 text-left font-mono text-[11px];
+  }
+  .compare-table th,
+  .compare-table td {
+    @apply max-w-64 truncate border-b border-border/50 px-3 py-1 align-top;
+  }
+  .compare-table thead th {
+    @apply sticky top-0 z-10 bg-background font-sans font-medium;
+  }
+  .compare-table tbody th {
+    @apply sticky left-0 z-[5] bg-background font-normal text-muted-foreground;
+  }
+  .compare-table td.differs {
+    background: var(--warning-tint);
+  }
+  .compare-table .group-start {
+    @apply border-l;
+  }
+  .finding-row {
+    @apply flex w-full items-start gap-3 border-b border-border/50 px-4 py-2.5 text-left text-xs outline-none hover:bg-accent focus-visible:bg-accent;
+  }
+  .finding-row[aria-current="true"] {
+    @apply bg-secondary;
+  }
+  .text-warning {
+    color: var(--warning-ink);
+  }
+  .css-editor {
+    @apply min-h-0 flex-1 resize-none border-0 bg-transparent p-3 font-mono text-[12px] leading-5 outline-none;
+    tab-size: 2;
+  }
+}
+/* xyflow ships unlayered rules; overrides stay in the same cascade. */
+.react-flow__panel.canvas-toolbar {
+  margin: 12px;
+}
+/* Only the header drags a preview; the website keeps an ordinary pointer. */
+.react-flow__node.draggable:not(.dragging) {
+  cursor: default;
+}
+.pane-resize.react-flow__resize-control.handle {
+  @apply size-4 rounded-none border-0 bg-transparent;
+}
+.pane-resize::after {
+  @apply absolute left-px top-px size-1.5 rounded-br-[3px] border-b-2 border-r-2 opacity-0 transition-opacity;
+  content: "";
+  border-color: var(--muted-foreground);
+}
+.react-flow__node:hover .pane-resize::after,
+.react-flow__node:has(.selected) .pane-resize::after {
+  @apply opacity-100;
+}
+.react-flow {
+  --xy-background-color: var(--workspace);
+  --xy-background-pattern-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  --xy-minimap-background-color: var(--background);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--workspace) 72%, transparent);
+  --xy-minimap-mask-stroke-color: var(--primary);
+  --xy-minimap-mask-stroke-width: 1;
+  --xy-minimap-node-background-color: var(--border);
+}
+.react-flow__minimap {
+  @apply overflow-hidden rounded-lg;
+  margin: 12px;
+  outline: 1px solid var(--border);
+}
+.react-flow__minimap-node.selected {
+  fill: var(--primary);
+}
+.space-pan .react-flow__node {
+  pointer-events: none;
+}
+.space-pan .react-flow__pane {
+  cursor: grab;
+}
+.space-pan .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+@container (width < 210px) {
+  .pane-expand {
+    display: none;
+  }
+  .pane-header {
+    height: 76px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+  .pane-drag-handle {
+    width: 8px;
+  }
+}
+@media (max-width: 1050px) {
+  .sidebar {
+    width: 204px;
+  }
+  .toolbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .toolbar-label {
+    display: none;
+  }
+  .pane-expand {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

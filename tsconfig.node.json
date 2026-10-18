@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node", "electron-vite/node"] },
+  "include": [
+    "electron.vite.config.ts",
+    "scripts",
+    "src/cli",
+    "src/core",
+    "src/main",
+    "src/mcp",
+    "src/preload",
+    "src/runtime",
+    "src/shared"
+  ]
+}

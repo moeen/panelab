@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PaneLab test website</title>
+    <style>
+      body { margin: 8px; font: 14px sans-serif; background: #fff; color: #111 }
+      button, input, select, textarea, a { display: block; margin: 4px 0; min-height: 24px }
+      [hidden] { display: none }
+      #scroller { height: 90px; width: 180px; overflow: auto; border: 1px solid }
+      #scroller div { height: 600px; width: 500px }
+      iframe { width: 240px; height: 100px }
+    </style>
+  </head>
+  <body>
+    <button type="button" id="counter" data-testid="counter">Increment</button>
+    <label for="text">Website text</label><input id="text" name="text" />
+    <label for="checked">Website checkbox</label><input id="checked" type="checkbox" />
+    <label for="choice">Website choice</label><select id="choice"><option value="a">A</option><option value="b">B</option></select>
+    <label for="textarea">Website textarea</label><textarea id="textarea"></textarea>
+    <div id="editable" role="textbox" tabindex="0" contenteditable="true" aria-label="Website editable"></div>
+    <button type="button" id="storage">Write storage</button>
+    <a id="next" href="/second">Next page</a>
+    <button type="button" id="popup">Open popup</button>
+    <button type="button" id="alert">Website alert</button>
+    <button type="button" id="confirm">Website confirm</button>
+    <button type="button" id="prompt">Website prompt</button>
+    <label for="upload">Website upload</label><input id="upload" type="file" multiple />
+    <a id="download" href="/download" download>Download fixture</a>
+    <button type="button" id="network">Network requests</button>
+    <div id="scroller" data-testid="scroller"><div>Scroll container</div></div>
+    <iframe title="Fixture frame" name="fixture-frame" src="/frame"></iframe>
+    <div style="height:1600px"></div>
+    <script>
+      const parameters = new URLSearchParams(location.search)
+      const setCookie = (value) => {
+        // biome-ignore lint/suspicious/noDocumentCookie: Verify the common cookie API in Chromium and WebKit.
+        document.cookie = value
+      }
+      const pane = parameters.get('pane') || ''
+      if (parameters.has('logout')) setCookie('session=; path=/; max-age=0')
+      let token = document.cookie.match(/fixture=([^;]+)/)?.[1]
+      if (!token) { token = crypto.randomUUID(); setCookie(`fixture=${token}; path=/; SameSite=Lax`) }
+      let database = ''
+      // Page-local count; localStorage is shared by every pane in a workspace.
+      let clicks = 0
+      let uploaded = ''
+      const element = (id) => document.getElementById(id)
+      const databaseReady = new Promise((resolve, reject) => {
+        const request = indexedDB.open('panelab-fixture', 1)
+        request.onupgradeneeded = () => request.result.createObjectStore('values')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const db = request.result
+          const transaction = db.transaction('values')
+          const get = transaction.objectStore('values').get('token')
+          get.onsuccess = () => { database = get.result || ''; resolve(db) }
+        }
+      })
+      function report() {
+        const boxes = {}
+        for (const id of ['counter', 'text', 'checked', 'storage', 'next', 'popup', 'alert', 'confirm', 'prompt', 'upload', 'download', 'network', 'scroller']) {
+          const rect = element(id)?.getBoundingClientRect()
+          if (rect) boxes[id] = { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        }
+        const scrolling = document.scrollingElement
+        const container = element('scroller')
+        return fetch('/report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+          pane, token, path: location.pathname, width: innerWidth, height: innerHeight,
+          screenWidth: screen.width, screenHeight: screen.height, dpr: devicePixelRatio,
+          platform: navigator.platform, userAgent: navigator.userAgent, touch: navigator.maxTouchPoints,
+          count: Number(localStorage.getItem('count') || 0), clicks, stored: localStorage.getItem('token') || '', value: element('text')?.value || '',
+          checked: element('checked')?.checked || false, choice: element('choice')?.value || '',
+          cookie: document.cookie, database, uploaded,
+          scroll: scrolling.scrollTop / Math.max(1, scrolling.scrollHeight - scrolling.clientHeight),
+          containerScroll: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight), boxes,
+        }) })
+      }
+      if (location.pathname === '/missing') element('counter').remove()
+      if (location.pathname === '/ambiguous') {
+        const duplicate = element('counter').cloneNode(true)
+        element('counter').after(duplicate)
+      }
+      element('counter')?.addEventListener('click', () => { clicks++; localStorage.setItem('count', String(Number(localStorage.getItem('count') || 0) + 1)); void report() })
+      element('storage').addEventListener('click', async () => {
+        localStorage.setItem('token', 'fixture-secret')
+        setCookie('session=fixture-secret; path=/; SameSite=Lax')
+        const db = await databaseReady
+        await new Promise((resolve) => {
+          const transaction = db.transaction('values', 'readwrite')
+          transaction.objectStore('values').put('fixture-secret', 'token')
+          transaction.oncomplete = resolve
+        })
+        database = 'fixture-secret'
+        void report()
+      })
+      element('popup').onclick = () => window.open('/popup', '_blank')
+      element('alert').onclick = () => { alert('Fixture alert'); void report() }
+      element('confirm').onclick = () => { localStorage.setItem('confirmed', String(confirm('Fixture confirm'))); void report() }
+      element('prompt').onclick = () => { localStorage.setItem('prompt', prompt('Fixture prompt', 'default') || ''); void report() }
+      element('upload').onchange = async () => { uploaded = await element('upload').files[0]?.text() || ''; void report() }
+      element('network').onclick = () => {
+        console.log('fixture-console')
+        setTimeout(() => { throw new Error('fixture-page-error') }, 0)
+        for (const path of ['/json', '/binary', '/large', '/fail']) void fetch(path).catch(() => {})
+      }
+      for (const event of ['input', 'change']) document.addEventListener(event, () => void report())
+      document.addEventListener('scroll', () => void report(), true)
+      void databaseReady.then(report)
+    </script>
+  </body>
+</html>

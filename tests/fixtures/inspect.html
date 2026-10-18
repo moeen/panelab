@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PaneLab inspection fixture</title>
+    <style>
+      body { margin: 0; font: 14px sans-serif; background: #fff; color: #111 }
+      #card { box-sizing: content-box; width: 200px; padding: 8px; border: 2px solid #333; margin: 4px }
+      .clip { width: 60px; overflow: hidden; white-space: nowrap }
+      #wide { width: 3000px; height: 20px; background: #eee }
+      .card-title { font-weight: 600 }
+    </style>
+  </head>
+  <body>
+    <div id="card" data-testid="card"><span class="card-title">Card</span><span>Second</span></div>
+    <p class="clip">This text is clipped silently by its box</p>
+    <div id="firefox-hidden">Hidden only in Firefox</div>
+    <div id="wide"></div>
+    <script>
+      if (navigator.userAgent.includes('Firefox'))
+        document.getElementById('firefox-hidden').style.display = 'none'
+    </script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "author": "PaneLab project",
+  "source": "panelab-mark.svg",
+  "master": "panelab.svg",
+  "exports": ["panelab.png", "panelab.icns"],
+  "method": "Authored vector geometry; Chromium renders transparent PNG representations; macOS iconutil assembles ICNS.",
+  "regenerate": "pnpm icons:generate"
+}

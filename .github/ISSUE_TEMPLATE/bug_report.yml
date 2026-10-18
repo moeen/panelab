@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in PaneLab doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open localhost:3000 on iPhone 16 in WebKit
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PaneLab version
+      description: From the About panel, the release you downloaded, or `git rev-parse --short HEAD`.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.6
+    validations:
+      required: true
+  - type: dropdown
+    id: engines
+    attributes:
+      label: Engines affected
+      multiple: true
+      options: [Chromium, WebKit, Firefox, Not engine-specific]
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options: [App window, CLI, MCP server, Agent socket, Install or build]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Terminal output, console errors, or screenshots. Remove anything private first.

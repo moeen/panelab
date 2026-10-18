@@ -1,0 +1,64 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/out",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.impeccable",
+      "!pnpm-lock.yaml",
+      "!**/coverage",
+      "!**/test-results",
+      "!**/playwright-report",
+      "!**/.vitest"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "rules": {
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "a11y": {
+        "useSemanticElements": "off"
+      },
+      "preset": "recommended"
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "tests/fixtures/runtime.ts",
+        "tests/fixtures/electron.ts",
+        "tests/integration/sync.spec.ts"
+      ],
+      "linter": { "rules": { "correctness": { "noEmptyPattern": "off" } } }
+    },
+    {
+      "includes": ["src/renderer/styles.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    }
+  ]
+}
