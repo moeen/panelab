@@ -88,7 +88,7 @@ Inspection covers the main frame. An iframe is inspected as the `<iframe>` eleme
 
 Create named workspaces from the title bar. Each one saves its URL, devices, canvas layout, and sync settings. Device presets save a set of devices and their layout for reuse. Deleting a workspace asks first, since it also removes the workspace's saved sign-ins.
 
-All previews in a workspace share one website session across engines. Sign in once and every preview is signed in. Cookies and localStorage sync live, within about two seconds. IndexedDB is captured when the session is saved and restored when a preview's context is created, with the most recently used preview winning. SessionStorage, the HTTP cache, and full browser profiles aren't kept.
+All previews in a workspace share one website session across engines. Sign in once and every preview is signed in. Cookies and localStorage sync live, within about two seconds. IndexedDB is captured when the session is saved and restored when a preview's context is created, with the most recently used preview winning. SessionStorage, the HTTP cache, and full browser profiles aren't kept. Captcha and bot-check state stays in the engine that created it, because another engine replaying it fails verification: reCAPTCHA (`_GRECAPTCHA`, Google's `rc::` keys), Cloudflare challenges and Turnstile (`cf_clearance`, `__cf_bm`, `cf.turnstile.` keys), AWS WAF (`aws-waf-token`), and DataDome (`datadome`). Solve a captcha in the preview you sign in from; each other preview passes its own check if the site asks again.
 
 Sessions are saved every 30 seconds, on workspace switches, and on quit. **Workspace options → Reset website sessions…** signs every preview out and clears the saved session.
 

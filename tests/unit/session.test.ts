@@ -149,6 +149,46 @@ describe('engine compatibility', () => {
     expect(cookieForEngine(partitioned, 'webkit')).not.toHaveProperty('partitionKey')
     expect(cookieForEngine(partitioned, 'firefox')).toEqual(cookie())
   })
+  test('keeps captcha and bot-check state in the engine that created it', () => {
+    const recaptcha = cookie({ name: '_GRECAPTCHA', domain: 'www.google.com' })
+    const bound = ['cf_clearance', '__cf_bm', 'aws-waf-token', 'datadome'].map((name) =>
+      cookie({ name }),
+    )
+    const change = diffCookies(map([{ ...recaptcha, path: '/gone' }]), [
+      recaptcha,
+      ...bound,
+      cookie(),
+    ])
+    expect(change.cookies.map((item) => item.name)).toEqual(['session'])
+    expect(change.removedCookies).toEqual([])
+    expect(
+      diffStorage(
+        'https://challenges.cloudflare.com',
+        undefined,
+        new Map([['cf.turnstile.u', 'id']]),
+        undefined,
+      ),
+    ).toBeNull()
+    const items = new Map([
+      ['rc::a', '1'],
+      ['token', '2'],
+    ])
+    expect(
+      diffStorage('https://www.google.com', new Map([['rc::b', '0']]), items, undefined),
+    ).toEqual({ origin: 'https://www.google.com', set: [['token', '2']], removed: [] })
+    expect(diffStorage('https://a.test', undefined, items, undefined)?.set).toEqual([...items])
+    const seeded = snapshotForEngine(
+      {
+        cookies: [recaptcha, cookie()],
+        origins: [
+          { origin: 'https://www.google.com', localStorage: [{ name: 'rc::a', value: '1' }] },
+        ],
+      },
+      'webkit',
+    )
+    expect(seeded.cookies.map((item) => item.name)).toEqual(['session'])
+    expect(seeded.origins[0]?.localStorage).toEqual([])
+  })
   test('downgrades insecure SameSite=None cookies and drops expired ones', () => {
     expect(cookieForEngine(cookie({ sameSite: 'None' }), 'chromium').sameSite).toBe('Lax')
     expect(cookieForEngine(cookie({ sameSite: 'None', secure: true }), 'chromium').sameSite).toBe(

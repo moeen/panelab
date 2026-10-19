@@ -22,16 +22,35 @@ export function sameCookie(a: Cookie, b: Cookie): boolean {
   return a.value === b.value && Math.abs(a.expires - b.expires) < 1
 }
 
+// Captcha and bot-check state attests the browser that earned it, and vendors reissue it per browser.
+// Replaying it in another engine fails verification, so each engine keeps its own copy.
+const engineBoundCookies = new Set([
+  '_GRECAPTCHA', // reCAPTCHA
+  'cf_clearance', // Cloudflare challenges and Turnstile
+  '__cf_bm', // Cloudflare bot score, also set by hCaptcha
+  'aws-waf-token', // AWS WAF CAPTCHA and challenge
+  'datadome', // DataDome CAPTCHA and Device Check
+])
+const engineBoundStorage: { origins: string[]; prefix: string }[] = [
+  { origins: ['https://www.google.com', 'https://www.recaptcha.net'], prefix: 'rc::' },
+  { origins: ['https://challenges.cloudflare.com'], prefix: 'cf.turnstile.' },
+]
+const engineBoundCookie = (cookie: Cookie): boolean => engineBoundCookies.has(cookie.name)
+const engineBoundItem = (origin: string, name: string): boolean =>
+  engineBoundStorage.some((rule) => rule.origins.includes(origin) && name.startsWith(rule.prefix))
+
 export function diffCookies(before: Map<string, Cookie>, after: Cookie[]): StorageChange {
   const change = emptyChange()
   const seen = new Set<string>()
   for (const cookie of after) {
     const key = cookieKey(cookie)
     seen.add(key)
+    if (engineBoundCookie(cookie)) continue
     const previous = before.get(key)
     if (!previous || !sameCookie(previous, cookie)) change.cookies.push(cookie)
   }
-  for (const [key, cookie] of before) if (!seen.has(key)) change.removedCookies.push(cookie)
+  for (const [key, cookie] of before)
+    if (!seen.has(key) && !engineBoundCookie(cookie)) change.removedCookies.push(cookie)
   return change
 }
 
@@ -43,8 +62,12 @@ export function diffStorage(
   reference: LocalStorage | undefined,
 ): StorageChange['storage'][number] | null {
   const base = before ?? reference ?? new Map<string, string>()
-  const set = [...after].filter(([name, value]) => base.get(name) !== value)
-  const removed = before ? [...before.keys()].filter((name) => !after.has(name)) : []
+  const set = [...after].filter(
+    ([name, value]) => base.get(name) !== value && !engineBoundItem(origin, name),
+  )
+  const removed = before
+    ? [...before.keys()].filter((name) => !after.has(name) && !engineBoundItem(origin, name))
+    : []
   return set.length || removed.length ? { origin, set, removed } : null
 }
 
@@ -120,11 +143,20 @@ export function cookieForEngine(cookie: Cookie, engine: Engine): Cookie {
 
 export function snapshotForEngine(snapshot: StorageSnapshot, engine: Engine): StorageSnapshot {
   const now = Date.now() / 1000
+  // Saved snapshots may predate the engine-bound exclusions.
   return {
     ...snapshot,
     cookies: snapshot.cookies
-      .filter((cookie) => cookie.expires === -1 || cookie.expires > now)
+      .filter(
+        (cookie) => (cookie.expires === -1 || cookie.expires > now) && !engineBoundCookie(cookie),
+      )
       .map((cookie) => cookieForEngine(cookie, engine)),
+    origins: snapshot.origins.map((origin) => ({
+      ...origin,
+      localStorage: origin.localStorage.filter(
+        (item) => !engineBoundItem(origin.origin, item.name),
+      ),
+    })),
   }
 }
 
