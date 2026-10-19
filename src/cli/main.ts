@@ -145,7 +145,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     io.out(json ? JSON.stringify(value, null, 2) : text)
   const [command, ...rest] = positionals
   if (values.version) {
-    io.out('0.1.0')
+    io.out('0.1.1')
     return exitCodes.ok
   }
   if (values.help || !command) {

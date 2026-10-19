@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { actActions, type LabApi } from '../shared/agent'
 import { engines } from '../shared/engines'
 
-export const serverVersion = '0.1.0'
+export const serverVersion = '0.1.1'
 
 const instructions = `PaneLab renders one website in real Chromium, WebKit, and Firefox previews with device emulation.
 Workflow: open_preview (url + devices + engines) → screenshot or scan_findings → inspect_element on a reported selector → edit the code → reload → screenshot/visual_diff to verify.
