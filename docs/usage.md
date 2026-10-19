@@ -57,7 +57,7 @@ There's no pane limit. Four to eight active previews is the intended range.
 
 Synchronization starts off. Turn it on from the toolbar and pick which actions to mirror: navigation, reload, clicks, typing, and scrolling. Exclude a pane from its settings menu.
 
-Clicks and typing find the same element in every pane by test id, id, name, label, text, then structural path. Scrolling uses relative positions. When a pane can't find a unique match, it skips the action and says so in its footer.
+Clicks and typing find the same element in every pane by test id, id, name, label, text, then structural path. Typing also mirrors Escape, so dialogs and menus close everywhere. Scrolling uses relative positions. When a pane can't find a unique match, it skips the action and says so in its footer. If the skipped click navigated the source pane, for example a link hidden in a phone layout, that pane follows the new address instead.
 
 ## Per-pane tools
 

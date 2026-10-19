@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PaneLab app fixture</title>
+    <style>
+      body { margin: 8px; font: 14px sans-serif }
+      .compact nav a { display: none }
+      section div { display: inline-block; margin: 4px; padding: 4px; border: 1px solid }
+      .list { height: 80px; width: 200px; overflow: auto; border: 1px solid }
+      .list p { height: 400px; margin: 0 }
+      .modal { position: fixed; inset: 40px; background: #eee }
+    </style>
+  </head>
+  <body>
+    <!-- Like many framework apps: no ids, no test ids, repeated labels. -->
+    <header><nav><a href="/app/docs">Docs</a></nav></header>
+    <main>
+      <section>
+        <div><span>Alpha</span><button type="button">Add</button></div>
+        <div><span>Beta</span><button type="button">Add</button></div>
+        <div><span>Gamma</span><button type="button">Add</button></div>
+      </section>
+      <div class="list"><p>Scrollable list</p></div>
+      <button type="button" class="open">Open dialog</button>
+      <div class="modal" hidden><input placeholder="Search" /></div>
+      <div style="height:1200px"></div>
+    </main>
+    <script>
+      const parameters = new URLSearchParams(location.search)
+      if (parameters.has('pane')) sessionStorage.setItem('pane', parameters.get('pane'))
+      if (parameters.has('compact')) sessionStorage.setItem('compact', '1')
+      if (sessionStorage.getItem('compact')) document.documentElement.classList.add('compact')
+      const added = []
+      const modal = document.querySelector('.modal')
+      const list = document.querySelector('.list')
+      const box = (element) => {
+        const rect = element.getBoundingClientRect()
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      }
+      const report = () =>
+        fetch('/report-app', { method: 'POST', body: JSON.stringify({
+          pane: sessionStorage.getItem('pane') || '', path: location.pathname, added: added.slice(),
+          modal: !modal.hidden, listScroll: list.scrollTop / Math.max(1, list.scrollHeight - list.clientHeight),
+          boxes: { docs: box(document.querySelector('nav a')), beta: box(document.querySelectorAll('section button')[1]),
+            list: box(list), open: box(document.querySelector('.open')), input: box(modal.querySelector('input')) },
+        }) })
+      for (const button of document.querySelectorAll('section button'))
+        button.addEventListener('click', () => { added.push(button.previousElementSibling.textContent); void report() })
+      document.querySelector('.open').addEventListener('click', () => { modal.hidden = false; modal.querySelector('input').focus(); void report() })
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { modal.hidden = true; void report() } })
+      list.addEventListener('scroll', () => void report())
+      void report()
+    </script>
+  </body>
+</html>

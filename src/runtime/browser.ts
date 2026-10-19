@@ -59,6 +59,8 @@ type Entry = {
   heldButtons: Set<'left' | 'middle' | 'right'>
   pendingSync: Map<string, { frame: Frame; action: SyncAction }>
   syncRunning: boolean
+  // Per follower: whether it replayed this pane's latest click, which then drives its navigation.
+  clickReplays: Map<string, Promise<boolean>>
   historyProbe: number
   disposed: boolean
   profileFingerprint: string
@@ -189,6 +191,7 @@ export class BrowserRuntime {
       heldButtons: new Set(),
       pendingSync: new Map(),
       syncRunning: false,
+      clickReplays: new Map(),
       historyProbe: 0,
       disposed: false,
       profileFingerprint: JSON.stringify(this.profiles.get(config.deviceId)),
@@ -295,15 +298,23 @@ export class BrowserRuntime {
         this.workspace?.sync.enabled &&
         this.workspace.sync.navigation &&
         !entry.config.excluded &&
-        entry.echo.broadcastingNavigation() &&
+        entry.echo.broadcasting() &&
         /^https?:/.test(url)
       ) {
+        // A replayed click navigates its follower; followers that couldn't replay it follow the URL.
+        const covered = !entry.echo.broadcastingNavigation()
         for (const follower of this.followers(entry)) {
-          follower.echo.automate()
-          void this.enqueue(follower, async () => {
-            await this.open(follower)
-            await this.navigate(follower, url, true)
-          }).catch(() => {})
+          const replayed = covered && entry.clickReplays.get(follower.config.id)
+          void Promise.resolve(replayed)
+            .then((matched) => {
+              if (matched) return
+              follower.echo.automate()
+              return this.enqueue(follower, async () => {
+                await this.open(follower)
+                await this.navigate(follower, url, true)
+              })
+            })
+            .catch(() => {})
         }
       }
     })
@@ -385,13 +396,21 @@ export class BrowserRuntime {
       !sync?.enabled ||
       source.config.excluded ||
       (action.kind === 'click' && !sync.clicks) ||
-      (action.kind === 'input' && !sync.typing) ||
+      ((action.kind === 'input' || action.kind === 'key') && !sync.typing) ||
       (action.kind === 'scroll' && !sync.scroll)
     )
       return
-    if (action.kind === 'click') source.echo.coverNavigation()
+    if (action.kind === 'click') {
+      source.echo.coverNavigation()
+      source.clickReplays = new Map()
+    }
     for (const follower of this.followers(source)) {
       if (action.kind === 'click') {
+        source.clickReplays.set(
+          follower.config.id,
+          this.enqueue(follower, () => this.replay(follower, frame, action)).catch(() => false),
+        )
+      } else if (action.kind === 'key') {
         void this.enqueue(follower, () => this.replay(follower, frame, action)).catch(() => {})
       } else {
         // Latest values win while a slow follower finishes its preceding action.
@@ -414,9 +433,9 @@ export class BrowserRuntime {
       }
     }
   }
-  private async replay(entry: Entry, source: Frame, action: SyncAction): Promise<void> {
+  private async replay(entry: Entry, source: Frame, action: SyncAction): Promise<boolean> {
     const page = entry.page
-    if (!page) return
+    if (!page) return false
     entry.echo.replay()
     try {
       const frame = matchingFrame(source, page)
@@ -428,12 +447,14 @@ export class BrowserRuntime {
           ? null
           : `Skipped ${action.kind}: matching target is missing or ambiguous.`,
       })
+      return Boolean(matched)
     } catch {
       this.emit({
         type: 'sync',
         paneId: entry.config.id,
         message: `Skipped ${action.kind}: target is unavailable.`,
       })
+      return false
     } finally {
       entry.echo.settle()
     }

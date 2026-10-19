@@ -13,6 +13,11 @@ export const syncActionSchema = z.discriminatedUnion('kind', [
     selectionEnd: z.number().int().nonnegative().nullable(),
   }),
   z.object({
+    kind: z.literal('key'),
+    selectors: z.array(selectorSchema).max(8),
+    key: z.literal('Escape'),
+  }),
+  z.object({
     kind: z.literal('scroll'),
     selectors: z.array(selectorSchema).max(8),
     document: z.boolean(),
@@ -82,11 +87,18 @@ export async function replayAction(frame: Frame, action: SyncAction): Promise<bo
     }, action)
     return true
   }
+  // Keys pressed with nothing focused go to the follower's page as a whole.
+  if (action.kind === 'key' && !action.selectors.length) {
+    await frame.page().keyboard.press(action.key)
+    return true
+  }
   const resolution = await resolveTarget(frame, action.selectors, { visible: true })
   if (resolution.status !== 'found') return false
   const target = resolution.locator
   if (action.kind === 'click') {
     await target.click({ timeout: 1800, noWaitAfter: true })
+  } else if (action.kind === 'key') {
+    await target.press(action.key, { timeout: 1800, noWaitAfter: true })
   } else if (action.kind === 'scroll') {
     await target.evaluate(
       (element, { x, y }) =>

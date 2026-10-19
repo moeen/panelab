@@ -29,12 +29,23 @@ export const reportSchema = z.object({
   boxes: z.record(z.string(), boxSchema),
 })
 export type Report = z.infer<typeof reportSchema>
+export const appReportSchema = z.object({
+  pane: z.string(),
+  path: z.string(),
+  added: z.array(z.string()),
+  modal: z.boolean(),
+  listScroll: z.number(),
+  boxes: z.record(z.string(), boxSchema),
+})
+export type AppReport = z.infer<typeof appReportSchema>
 
 export async function startSite() {
   const reports = new Map<string, Report>()
   let requests = 0
   const html = await readFile(new URL('./site.html', import.meta.url), 'utf8')
   const inspect = await readFile(new URL('./inspect.html', import.meta.url), 'utf8')
+  const app = await readFile(new URL('./app.html', import.meta.url), 'utf8')
+  const appReports = new Map<string, AppReport>()
   const server = createServer((request, response) => {
     requests++
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
@@ -59,6 +70,18 @@ export async function startSite() {
       })().catch(() => {
         if (!response.headersSent) response.writeHead(400).end()
       })
+    } else if (url.pathname === '/report-app') {
+      void (async () => {
+        let body = ''
+        for await (const chunk of request) body += String(chunk)
+        const parsed = appReportSchema.parse(JSON.parse(body))
+        appReports.set(parsed.pane, parsed)
+        response.writeHead(204).end()
+      })().catch(() => {
+        if (!response.headersSent) response.writeHead(400).end()
+      })
+    } else if (url.pathname.startsWith('/app')) {
+      response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }).end(app)
     } else if (url.pathname === '/download') {
       response
         .writeHead(200, {
@@ -111,6 +134,7 @@ export async function startSite() {
   return {
     url: `http://127.0.0.1:${address.port}`,
     reports,
+    appReports,
     requests: () => requests,
     close: async () => {
       server.closeAllConnections()

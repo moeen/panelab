@@ -171,6 +171,8 @@ test('page agent emits trusted input and correct platform/touch identity', async
     await page
       .locator('#counter')
       .evaluate((node) => node.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    // The page background (inside the body margin) is not a replayable target.
+    await page.mouse.click(2, 2)
     expect(actions).toEqual([])
     await page.locator('#counter').click()
     await expect.poll(() => actions.length).toBeGreaterThan(0)

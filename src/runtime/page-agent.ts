@@ -81,9 +81,10 @@ export function installPageAgent(options: PageAgentOptions): void {
       }
       cursor = cursor.parentElement
     }
-    if (cursor && cursor !== element && path.length < 6)
-      selectors.push({ kind: 'path', value: path.join(' > '), tag })
-    if (full) selectors.push({ kind: 'path', value: pathOf(element), tag })
+    const short = cursor !== null && cursor !== element && path.length < 6
+    if (short) selectors.push({ kind: 'path', value: path.join(' > '), tag })
+    // Framework markup often has no ids at all; a root-anchored path is the last resort.
+    if (full || !short) selectors.push({ kind: 'path', value: pathOf(element), tag })
     const limit = full ? 1000 : 500
     return selectors.filter((selector) => selector.value.length <= limit).slice(0, 8)
   }
@@ -98,7 +99,9 @@ export function installPageAgent(options: PageAgentOptions): void {
         element?.closest(
           'a,button,input,select,textarea,summary,[role="button"],[role="link"],[contenteditable]',
         ) ?? element
-      if (target) post({ kind: 'click', selectors: identify(target, false) })
+      // Replaying a click on the page background would hit whatever sits at a follower's center.
+      if (target && target !== document.documentElement && target !== document.body)
+        post({ kind: 'click', selectors: identify(target, false) })
     },
     true,
   )
@@ -137,6 +140,23 @@ export function installPageAgent(options: PageAgentOptions): void {
           : null,
     })
   }
+  // Escape dismisses dialogs and menus; other keys reach followers as the input they produce.
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (!event.isTrusted || event.key !== 'Escape' || event.repeat) return
+      const element = event.composedPath().find((node): node is Element => node instanceof Element)
+      post({
+        kind: 'key',
+        key: event.key,
+        selectors:
+          element && element !== document.body && element !== document.documentElement
+            ? identify(element, false)
+            : [],
+      })
+    },
+    true,
+  )
   document.addEventListener('input', onInput, true)
   document.addEventListener('change', onInput, true)
   let scrollTimer: ReturnType<typeof setTimeout> | undefined
