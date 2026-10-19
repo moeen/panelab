@@ -148,3 +148,47 @@ test('adopts Live CSS applied elsewhere unless a local edit is pending', () => {
   inspection.receiveInspection({ type: 'overrides', state: { inline: [], css: css('.a{}') } })
   expect(inspection.inspection().css.text).toBe('.mine{}')
 })
+
+test('inspector switches the selected preview and filters network requests by type', async () => {
+  const { default: Inspector } = await import('../../src/renderer/features/inspector')
+  const panes = store.workspace()?.panes ?? []
+  const second = panes[1]?.id ?? ''
+  function Harness() {
+    return <Inspector paneId={store.useApp().selected} tab="network" />
+  }
+  const screen = await render(<Harness />)
+  const request = (id: string, url: string, resourceType: string, status: number) =>
+    receive({
+      type: 'network',
+      paneId: second,
+      entry: {
+        id,
+        time: 0,
+        url,
+        method: 'GET',
+        resourceType,
+        status,
+        duration: 12,
+        size: 2048,
+        requestHeaders: {},
+        responseHeaders: {},
+        postData: null,
+        failure: null,
+      },
+    })
+  request('a', 'https://site.test/api/items', 'fetch', 500)
+  request('b', 'https://site.test/app.js', 'script', 200)
+
+  await screen.getByLabelText('Inspected preview').selectOptions(second)
+  expect(store.root().selected).toBe(second)
+  await expect.element(screen.getByRole('button', { name: '/app.js' })).toBeVisible()
+
+  await screen.getByRole('button', { name: /^Fetch\/XHR/ }).click()
+  await expect.element(screen.getByRole('button', { name: '/api/items' })).toBeVisible()
+  await expect.element(screen.getByRole('button', { name: '/app.js' })).not.toBeInTheDocument()
+  await expect.element(screen.getByText('1 / 2 requests · 2.0 KiB transferred')).toBeVisible()
+
+  await screen.getByRole('button', { name: 'All', exact: true }).click()
+  await screen.getByRole('button', { name: /^Errors/ }).click()
+  await expect.element(screen.getByRole('button', { name: '/app.js' })).not.toBeInTheDocument()
+})

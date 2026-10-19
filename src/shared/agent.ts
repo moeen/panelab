@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ConsoleEntry, NetworkEntry, PaneState } from './contracts'
+import { requestTypes } from './diagnostics'
 import { type Engine, engines } from './engines'
 import type { BoxModel, Finding, Target, TargetStatus } from './inspection'
 
@@ -12,6 +13,7 @@ export type LabMode = (typeof labModes)[number]
 const engineSchema = z.enum(engines)
 const paneIds = z.array(z.string().min(1).max(160)).min(1).max(64).optional()
 const selector = z.string().trim().min(1).max(2000)
+const diagnosticQuery = z.string().max(500).optional()
 const timeoutMs = z.number().int().min(100).max(120_000).optional()
 // Paths are resolved by the caller: a remote app has its own working directory.
 const absolutePath = z
@@ -86,12 +88,15 @@ export const labRequestSchema = z.discriminatedUnion('op', [
     op: z.literal('console'),
     paneIds,
     errorsOnly: z.boolean().optional(),
+    query: diagnosticQuery,
     limit: z.number().int().min(1).max(1000).optional(),
   }),
   z.object({
     op: z.literal('network'),
     paneIds,
     failedOnly: z.boolean().optional(),
+    query: diagnosticQuery,
+    types: z.array(z.enum(requestTypes)).max(requestTypes.length).optional(),
     limit: z.number().int().min(1).max(1000).optional(),
   }),
   z.object({ op: z.literal('css'), css: z.string().max(200_000), enabled: z.boolean().optional() }),

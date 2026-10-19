@@ -1,9 +1,25 @@
 import { X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { type KeyboardEvent, type MouseEvent, useDeferredValue, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { send } from '@/lib/store'
+import {
+  countTypes,
+  curlCommand,
+  formatBody,
+  formatBytes,
+  formatDuration,
+  requestTypeLabels,
+} from '@/lib/diagnostics'
+import { copyText, send } from '@/lib/store'
 import type { NetworkEntry } from '../../../shared/contracts'
+import {
+  filterNetwork,
+  isProblem,
+  type RequestType,
+  requestTypes,
+} from '../../../shared/diagnostics'
 import { Empty, FilterBar } from './parts'
+
+type Body = { text: string; omitted: boolean }
 
 export function NetworkPanel({
   paneId,
@@ -12,58 +28,139 @@ export function NetworkPanel({
 }: {
   paneId: string | null
   entries: NetworkEntry[]
-  bodies: Record<string, { text: string; omitted: boolean }>
+  bodies: Record<string, Body>
 }) {
   const [query, setQuery] = useState('')
+  const [types, setTypes] = useState<ReadonlySet<RequestType>>(() => new Set())
+  const [problems, setProblems] = useState(false)
   const [requestId, setRequestId] = useState<string | null>(null)
+  const deferredQuery = useDeferredValue(query)
   const filtered = useMemo(
-    () =>
-      entries.filter((entry) =>
-        `${entry.url} ${entry.method} ${entry.status ?? ''}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [entries, query],
+    () => filterNetwork(entries, { query: deferredQuery, types, problems }),
+    [entries, deferredQuery, types, problems],
+  )
+  const counts = useMemo(() => countTypes(entries), [entries])
+  const problemCount = useMemo(() => entries.filter(isProblem).length, [entries])
+  const transferred = useMemo(
+    () => filtered.reduce((total, entry) => total + (entry.size ?? 0), 0),
+    [filtered],
   )
   const selected = entries.find((entry) => entry.id === requestId)
+  const filtering = query !== '' || types.size > 0 || problems
+
+  function open(entry: NetworkEntry): void {
+    setRequestId(entry.id)
+    if (paneId) void send({ type: 'network.body', paneId, requestId: entry.id })
+  }
+  // Click shows one type; ⌘/Ctrl-click combines types, as in browser DevTools.
+  function toggleType(type: RequestType | null, event: MouseEvent): void {
+    setTypes((current) => {
+      if (!type) return new Set()
+      if (!(event.metaKey || event.ctrlKey))
+        return current.size === 1 && current.has(type) ? new Set() : new Set([type])
+      const next = new Set(current)
+      if (!next.delete(type)) next.add(type)
+      return next
+    })
+  }
+  function onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') setRequestId(null)
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    const index = filtered.findIndex((entry) => entry.id === requestId)
+    const next = filtered[event.key === 'ArrowDown' ? index + 1 : Math.max(index - 1, 0)]
+    if (next) {
+      open(next)
+      document.getElementById(`request-${next.id}`)?.focus()
+    }
+  }
   return (
     <>
       <div className="flex min-w-0 flex-1 flex-col">
-        <FilterBar label="network" query={query} onQuery={setQuery} />
-        <div className="min-h-0 flex-1 overflow-auto">
+        <FilterBar
+          label="network"
+          placeholder="Filter URL, method, status… (-term excludes)"
+          query={query}
+          onQuery={setQuery}
+        />
+        <div className="network-types" role="group" aria-label="Filter by request type">
+          <Button
+            size="sm"
+            variant={types.size ? 'ghost' : 'secondary'}
+            className="h-6 px-2 text-[11px]"
+            aria-pressed={!types.size}
+            onClick={(event) => toggleType(null, event)}
+          >
+            All
+          </Button>
+          {requestTypes.map((type) =>
+            counts.has(type) || types.has(type) ? (
+              <Button
+                key={type}
+                size="sm"
+                variant={types.has(type) ? 'secondary' : 'ghost'}
+                className="h-6 px-2 text-[11px]"
+                aria-pressed={types.has(type)}
+                title="⌘-click to combine types"
+                onClick={(event) => toggleType(type, event)}
+              >
+                {requestTypeLabels[type]}
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {counts.get(type) ?? 0}
+                </span>
+              </Button>
+            ) : null,
+          )}
+          <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+          <Button
+            size="sm"
+            variant={problems ? 'secondary' : 'ghost'}
+            className="h-6 px-2 text-[11px]"
+            aria-pressed={problems}
+            title="Failed requests and HTTP 4xx/5xx responses"
+            onClick={() => setProblems((value) => !value)}
+          >
+            Errors
+            <span
+              className={`font-mono text-[10px] ${problemCount ? 'text-destructive' : 'text-muted-foreground'}`}
+            >
+              {problemCount}
+            </span>
+          </Button>
+        </div>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: arrow keys move between the focusable request buttons inside. */}
+        <div className="min-h-0 flex-1 overflow-auto" onKeyDown={onKeyDown}>
           {filtered.length ? (
             <table className="w-full table-fixed text-left text-xs">
               <thead className="sticky top-0 bg-background text-[10px] text-muted-foreground">
                 <tr>
                   <th className="w-14 px-3 py-2 font-medium">Status</th>
                   <th className="w-16 py-2 font-medium">Method</th>
-                  <th className="py-2 font-medium">Request</th>
+                  <th className="py-2 font-medium">Name</th>
                   <th className="w-20 py-2 font-medium">Type</th>
-                  <th className="w-16 py-2 pr-3 text-right font-medium">Time</th>
+                  <th className="w-20 py-2 text-right font-medium">Size</th>
+                  <th className="w-20 py-2 pr-3 text-right font-medium">Time</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((entry) => (
                   <tr
                     key={entry.id}
-                    className={`border-t border-border/50 hover:bg-accent ${entry.id === requestId ? 'bg-secondary' : ''}`}
+                    className={`network-row ${entry.id === requestId ? 'bg-secondary' : ''}`}
                   >
                     <td
-                      className={`px-3 py-1.5 font-mono ${entry.failure || (entry.status ?? 0) >= 400 ? 'text-destructive' : 'text-muted-foreground'}`}
+                      className={`px-3 py-1.5 font-mono ${isProblem(entry) ? 'text-destructive' : 'text-muted-foreground'}`}
                     >
                       {entry.failure ? 'Fail' : (entry.status ?? '…')}
                     </td>
                     <td className="font-mono text-[10px] text-muted-foreground">{entry.method}</td>
                     <td className="truncate">
                       <button
+                        id={`request-${entry.id}`}
                         type="button"
-                        className="w-full truncate py-1 text-left outline-none focus-visible:underline"
+                        className={`w-full truncate py-1 text-left outline-none focus-visible:underline ${isProblem(entry) ? 'text-destructive' : ''}`}
                         title={entry.url}
-                        onClick={() => {
-                          setRequestId(entry.id)
-                          if (paneId)
-                            void send({ type: 'network.body', paneId, requestId: entry.id })
-                        }}
+                        onClick={() => open(entry)}
                       >
                         {requestName(entry.url)}
                       </button>
@@ -71,8 +168,11 @@ export function NetworkPanel({
                     <td className="truncate text-[10px] text-muted-foreground">
                       {entry.resourceType}
                     </td>
+                    <td className="text-right font-mono text-[10px] text-muted-foreground">
+                      {formatBytes(entry.size)}
+                    </td>
                     <td className="pr-3 text-right font-mono text-[10px] text-muted-foreground">
-                      {entry.duration !== null ? `${Math.round(entry.duration)}ms` : '…'}
+                      {formatDuration(entry.duration)}
                     </td>
                   </tr>
                 ))}
@@ -80,15 +180,21 @@ export function NetworkPanel({
             </table>
           ) : (
             <Empty
-              title={query ? 'No matching requests' : 'No requests captured yet'}
+              title={filtering ? 'No matching requests' : 'No requests captured yet'}
               detail={
-                query
-                  ? 'Change the filter to see more requests.'
+                filtering
+                  ? 'Change the filters to see more requests.'
                   : 'Navigate or reload a preview to inspect its traffic.'
               }
             />
           )}
         </div>
+        {entries.length ? (
+          <div className="network-summary" role="status">
+            {filtering ? `${filtered.length} / ${entries.length}` : entries.length} requests
+            {transferred ? ` · ${formatBytes(transferred)} transferred` : ''}
+          </div>
+        ) : null}
       </div>
       {selected ? (
         <RequestDetails
@@ -114,9 +220,18 @@ function RequestDetails({
   onClose,
 }: {
   entry: NetworkEntry
-  body: { text: string; omitted: boolean } | undefined
+  body: Body | undefined
   onClose: () => void
 }) {
+  const contentType = entry.responseHeaders['content-type']
+  const text = useMemo(
+    () => (body && !body.omitted ? formatBody(body.text, contentType) : body?.text),
+    [body, contentType],
+  )
+  const payload = useMemo(
+    () => entry.postData && formatBody(entry.postData, entry.requestHeaders['content-type']),
+    [entry.postData, entry.requestHeaders],
+  )
   return (
     <aside className="w-[42%] min-w-64 overflow-auto border-l p-3 text-xs">
       <div className="mb-2 flex items-start gap-2">
@@ -127,11 +242,42 @@ function RequestDetails({
           <X />
         </Button>
       </div>
-      <div className="mb-3 flex gap-3 text-[10px] text-muted-foreground">
+      <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
         <span>
           {entry.method} · {entry.status ?? 'Pending'}
         </span>
-        <span>{entry.size === null ? '' : `${(entry.size / 1024).toFixed(1)} KiB`}</span>
+        <span>{entry.resourceType}</span>
+        {entry.size !== null ? <span>{formatBytes(entry.size)}</span> : null}
+        {entry.duration !== null ? <span>{formatDuration(entry.duration)}</span> : null}
+        <time>{new Date(entry.time).toLocaleTimeString('en-GB')}</time>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 text-[11px]"
+          onClick={() => void copyText(entry.url, 'Request URL copied.')}
+        >
+          Copy URL
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 text-[11px]"
+          onClick={() => void copyText(curlCommand(entry), 'Request copied as cURL.')}
+        >
+          Copy as cURL
+        </Button>
+        {text !== undefined && !body?.omitted ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => void copyText(text, 'Response body copied.')}
+          >
+            Copy response
+          </Button>
+        ) : null}
       </div>
       {entry.failure ? <p className="mb-3 text-destructive">{entry.failure}</p> : null}
       {(
@@ -141,7 +287,12 @@ function RequestDetails({
         ] as const
       ).map(([title, headers]) => (
         <details key={title} className="mb-3">
-          <summary className="cursor-pointer font-medium">{title}</summary>
+          <summary className="cursor-pointer font-medium">
+            {title}{' '}
+            <span className="font-mono text-[10px] font-normal text-muted-foreground">
+              {Object.keys(headers).length}
+            </span>
+          </summary>
           <dl className="mt-2 space-y-1">
             {Object.entries(headers).map(([key, value]) => (
               <div key={key} className="break-all font-mono text-[10px] leading-relaxed">
@@ -152,19 +303,17 @@ function RequestDetails({
           </dl>
         </details>
       ))}
-      {entry.postData ? (
+      {payload ? (
         <details className="mb-3">
           <summary className="cursor-pointer font-medium">Request payload</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-[10px]">
-            {entry.postData}
-          </pre>
+          <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-[10px]">{payload}</pre>
         </details>
       ) : null}
       <p className="mb-2 font-medium">Response body</p>
       <pre
         className={`whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed ${body?.omitted ? 'text-muted-foreground' : ''}`}
       >
-        {body?.text ?? 'Loading response body…'}
+        {text ?? 'Loading response body…'}
       </pre>
     </aside>
   )

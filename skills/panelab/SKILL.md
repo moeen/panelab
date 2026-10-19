@@ -9,7 +9,7 @@ PaneLab renders one URL in real Chromium, WebKit (Safari-compatible), and Firefo
 
 ## Choose an interface
 
-- **MCP tools** (`panelab` server): `open_preview`, `screenshot`, `scan_findings`, `inspect_element`, `act`, `reload`, `visual_diff`, `set_live_css`, `get_console`, `get_network`, `list_devices`.
+- **MCP tools** (`panelab` server): `open_preview`, `screenshot`, `scan_findings`, `inspect_element`, `act`, `reload`, `visual_diff`, `set_live_css`, `get_console` and `get_network` (filter with `query`, `types`, `errorsOnly`/`failedOnly`), `list_devices`.
 - **CLI**: `panelab <command> <url> -d <device> -e <engines>`. Output is JSON when piped. Exit codes: 0 ok, 1 failed check, 2 usage, 3 engine or app unavailable.
 
 If the PaneLab app is open with agent access on, both drive its **Agent** workspace so the user watches live. Otherwise they run headless previews that close when the command ends.

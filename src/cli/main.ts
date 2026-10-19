@@ -18,6 +18,7 @@ import {
   type LabApi,
   UnavailableError,
 } from '../shared/agent'
+import { type RequestType, requestTypes } from '../shared/diagnostics'
 import { type Engine, engines } from '../shared/engines'
 import * as format from './format'
 
@@ -50,7 +51,7 @@ Previews
   act <url> <action> [target] [value]
                                  ${actActions.join('|')}; target is a CSS selector, or --text
   diff <url>                     Cross-engine diff, or --baseline dir [--update] [--threshold n]
-  console <url> / network <url>  Diagnostics     [--errors] [--failed] [--limit n]
+  console <url> / network <url>  Diagnostics     [--errors] [--failed] [--filter q] [--type a,b] [--limit n]
   watch <url>                    Re-run --run scan|shot|diff when --paths change (default .)
 
 Agents
@@ -91,6 +92,8 @@ const options = {
   threshold: { type: 'string' },
   errors: { type: 'boolean' },
   failed: { type: 'boolean' },
+  filter: { type: 'string' },
+  type: { type: 'string' },
   paths: { type: 'string', multiple: true },
   run: { type: 'string' },
   client: { type: 'string' },
@@ -103,6 +106,15 @@ const options = {
 type Values = ReturnType<typeof parse>['values']
 function parse(argv: string[]) {
   return parseArgs({ args: argv, options, allowPositionals: true, strict: true })
+}
+
+function requestTypeList(value: string | undefined): RequestType[] | undefined {
+  if (value === undefined) return undefined
+  return value.split(',').map((item) => {
+    const type = requestTypes.find((known) => known === item.trim())
+    if (!type) throw new UsageError(`--type must be one of ${requestTypes.join(', ')}.`)
+    return type
+  })
 }
 
 function number(value: string | undefined, name: string): number | undefined {
@@ -291,8 +303,19 @@ async function previews(
       const limit = number(values.limit, 'limit')
       const value =
         command === 'console'
-          ? await lab.call({ op: 'console', errorsOnly: values.errors, limit })
-          : await lab.call({ op: 'network', failedOnly: values.failed, limit })
+          ? await lab.call({
+              op: 'console',
+              errorsOnly: values.errors,
+              query: values.filter,
+              limit,
+            })
+          : await lab.call({
+              op: 'network',
+              failedOnly: values.failed,
+              query: values.filter,
+              types: requestTypeList(values.type),
+              limit,
+            })
       print(value, format.entries(value))
       return exitCodes.ok
     }

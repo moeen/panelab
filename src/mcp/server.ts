@@ -6,6 +6,7 @@ import {
 } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { actActions, type LabApi } from '../shared/agent'
+import { requestTypes } from '../shared/diagnostics'
 import { engines } from '../shared/engines'
 
 export const serverVersion = '0.1.1'
@@ -324,6 +325,11 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
       inputSchema: z.object({
         paneIds,
         errorsOnly: z.boolean().optional(),
+        query: z
+          .string()
+          .max(500)
+          .optional()
+          .describe('Space-separated terms that must all match; prefix -term to exclude.'),
         limit: z.number().int().min(1).max(1000).optional(),
       }),
       outputSchema: z.object({ panes: z.array(z.looseObject({ paneId: z.string() })) }),
@@ -335,10 +341,25 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
     'get_network',
     {
       title: 'Network',
-      description: 'Recent requests per preview with status, timing, and failures.',
+      description:
+        'Recent requests per preview with status, timing, headers, and failures. Filter with query and types to keep the result small.',
       inputSchema: z.object({
         paneIds,
-        failedOnly: z.boolean().optional(),
+        failedOnly: z.boolean().optional().describe('Only failed requests and HTTP 4xx/5xx.'),
+        query: z
+          .string()
+          .max(500)
+          .optional()
+          .describe(
+            'Space-separated terms that must all match the URL, method, status, or failure; prefix -term to exclude.',
+          ),
+        types: z
+          .array(z.enum(requestTypes))
+          .max(requestTypes.length)
+          .optional()
+          .describe(
+            'Request types to keep; fetch covers fetch and XHR, socket covers WebSocket and EventSource.',
+          ),
         limit: z.number().int().min(1).max(1000).optional(),
       }),
       outputSchema: z.object({ panes: z.array(z.looseObject({ paneId: z.string() })) }),

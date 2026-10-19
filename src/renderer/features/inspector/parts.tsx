@@ -21,11 +21,13 @@ export function Empty({
 }
 export function FilterBar({
   label,
+  placeholder = `Filter ${label}…`,
   query,
   onQuery,
   children,
 }: {
   label: string
+  placeholder?: string
   query: string
   onQuery: (value: string) => void
   children?: ReactNode
@@ -34,9 +36,9 @@ export function FilterBar({
     <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
       <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
       <Input
-        className="h-7 border-0 bg-transparent text-xs"
+        className="h-7 min-w-0 flex-1 border-0 bg-transparent text-xs"
         aria-label={`Filter ${label}`}
-        placeholder={`Filter ${label}…`}
+        placeholder={placeholder}
         value={query}
         onChange={(event) => onQuery(event.target.value)}
       />

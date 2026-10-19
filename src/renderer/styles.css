@@ -280,6 +280,16 @@
     @apply flex min-w-0 items-center gap-1 overflow-x-auto;
     scrollbar-width: none;
   }
+  .network-types {
+    @apply flex shrink-0 items-center gap-0.5 overflow-x-auto border-b px-3 py-1;
+    scrollbar-width: none;
+  }
+  .network-row {
+    @apply border-t border-border/50 hover:bg-accent;
+  }
+  .network-summary {
+    @apply flex h-6 shrink-0 items-center border-t px-3 font-mono text-[10px] text-muted-foreground;
+  }
   .tree-row {
     @apply flex h-6 cursor-default items-center gap-1 whitespace-nowrap pr-3 font-mono text-[11px] outline-none hover:bg-accent;
   }

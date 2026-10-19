@@ -1,13 +1,16 @@
 import { Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { NativeSelect } from '@/components/ui/native-select'
 import { useInspection } from '@/lib/inspection'
 import {
   type InspectorTab,
   paneLabel,
+  selectPane,
   send,
   setInspector,
   useDiagnostics,
   usePane,
+  workspace,
 } from '@/lib/store'
 import { ConsolePanel } from './console-panel'
 import { ElementsPanel } from './elements-panel'
@@ -69,13 +72,16 @@ export default function Inspector({ paneId, tab }: { paneId: string | null; tab:
             </Button>
           ))}
         </div>
-        <span className="ml-2 min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {perPane
-            ? paneId && pane?.device
-              ? `${paneLabel(paneId)}${host ? ` · ${host}` : ''}`
-              : 'Select a preview'
-            : 'All previews'}
-        </span>
+        <div className="ml-4 flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-muted-foreground">
+          {perPane ? (
+            <>
+              {host ? <span className="min-w-0 truncate font-mono text-[10px]">{host}</span> : null}
+              <PaneSelect paneId={paneId} />
+            </>
+          ) : (
+            'All previews'
+          )}
+        </div>
         {tab === 'console' || tab === 'network' ? (
           <Button
             variant="ghost"
@@ -113,5 +119,32 @@ export default function Inspector({ paneId, tab }: { paneId: string | null; tab:
         )}
       </div>
     </section>
+  )
+}
+
+function PaneSelect({ paneId }: { paneId: string | null }) {
+  const panes = workspace()?.panes ?? []
+  if (!panes.length) return <span>No previews</span>
+  const labels = panes.map((item) => paneLabel(item.id))
+  return (
+    <NativeSelect
+      className="h-7 max-w-64 border-0 bg-transparent pl-2 text-xs text-foreground"
+      aria-label="Inspected preview"
+      title="Inspected preview"
+      value={paneId ?? ''}
+      onChange={(event) => selectPane(event.target.value)}
+    >
+      {paneId ? null : <option value="">Select a preview</option>}
+      {panes.map((item, index) => {
+        const label = paneLabel(item.id)
+        // Identical device/engine pairs are told apart by canvas order.
+        const repeated = labels.filter((value) => value === label).length > 1
+        return (
+          <option key={item.id} value={item.id}>
+            {repeated ? `${label} (${index + 1})` : label}
+          </option>
+        )
+      })}
+    </NativeSelect>
   )
 }

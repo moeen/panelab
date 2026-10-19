@@ -36,6 +36,7 @@ import {
   requiresSynthetic,
   type Workspace,
 } from '../shared/contracts'
+import { filterNetwork, queryMatcher } from '../shared/diagnostics'
 import { keyProperties } from '../shared/inspection'
 import { diffShots, pngFileSize } from './diff'
 
@@ -181,20 +182,28 @@ export class Lab implements LabApi {
       }
     },
     inspect: (request) => this.inspect(request),
-    console: async ({ paneIds, errorsOnly, limit }) =>
-      (await this.paneIds(paneIds)).map((paneId) => ({
+    console: async ({ paneIds, errorsOnly, query, limit }) => {
+      const matches = queryMatcher(query ?? '')
+      return (await this.paneIds(paneIds)).map((paneId) => ({
         paneId,
         entries: (this.consoles.get(paneId) ?? [])
-          .filter((entry) => !errorsOnly || entry.level === 'error')
+          .filter(
+            (entry) =>
+              (!errorsOnly || entry.level === 'error') &&
+              matches(`${entry.text} ${entry.location}`),
+          )
           .slice(-(limit ?? 100)),
-      })),
-    network: async ({ paneIds, failedOnly, limit }) =>
-      (await this.paneIds(paneIds)).map((paneId) => ({
+      }))
+    },
+    network: async ({ paneIds, failedOnly, query, types, limit }) => {
+      const filter = { query: query ?? '', types: new Set(types), problems: failedOnly ?? false }
+      return (await this.paneIds(paneIds)).map((paneId) => ({
         paneId,
-        entries: [...(this.networks.get(paneId)?.values() ?? [])]
-          .filter((entry) => !failedOnly || entry.failure || (entry.status ?? 0) >= 400)
-          .slice(-(limit ?? 100)),
-      })),
+        entries: filterNetwork([...(this.networks.get(paneId)?.values() ?? [])], filter).slice(
+          -(limit ?? 100),
+        ),
+      }))
+    },
     css: async ({ css, enabled }) => {
       await this.paneIds(undefined)
       const reply = this.expect(

@@ -109,6 +109,18 @@ describe('Lab', () => {
     expect(logs?.entries.at(-1)?.text).toBe('1003')
     const [network] = await lab.call({ op: 'network', failedOnly: true })
     expect(network?.entries.map((entry) => entry.status)).toEqual([404])
+    const [scripts] = await lab.call({ op: 'network', types: ['script'], query: 'a.js -b.js' })
+    expect(scripts?.entries).toHaveLength(1)
+    const [fetches] = await lab.call({ op: 'network', types: ['fetch'] })
+    expect(fetches?.entries).toEqual([])
+    const [matched] = await lab.call({ op: 'console', query: '100 -1001', limit: 1000 })
+    expect(matched?.entries.map((entry) => entry.text)).toEqual([
+      '100',
+      '1000',
+      '1002',
+      '1003',
+      '1004',
+    ])
     await expect(lab.call({ op: 'console', paneIds: ['nope'] })).rejects.toThrow(/Unknown preview/)
   })
 

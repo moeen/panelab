@@ -1,32 +1,44 @@
-import { useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import { NativeSelect } from '@/components/ui/native-select'
 import type { ConsoleEntry } from '../../../shared/contracts'
+import { queryMatcher } from '../../../shared/diagnostics'
 import { Empty, FilterBar } from './parts'
 
 export function ConsolePanel({ entries }: { entries: ConsoleEntry[] }) {
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('all')
-  const filtered = useMemo(
-    () =>
-      entries.filter(
-        (entry) =>
-          (level === 'all' || entry.level === level) &&
-          `${entry.text} ${entry.location}`.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [entries, level, query],
-  )
+  const deferredQuery = useDeferredValue(query)
+  const filtered = useMemo(() => {
+    const matches = queryMatcher(deferredQuery)
+    return entries.filter(
+      (entry) =>
+        (level === 'all' || entry.level === level) && matches(`${entry.text} ${entry.location}`),
+    )
+  }, [entries, level, deferredQuery])
+  const counts = useMemo(() => {
+    const result = new Map<string, number>()
+    for (const entry of entries) result.set(entry.level, (result.get(entry.level) ?? 0) + 1)
+    return result
+  }, [entries])
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <FilterBar label="console" query={query} onQuery={setQuery}>
+      <FilterBar
+        label="console"
+        placeholder="Filter console… (-term excludes)"
+        query={query}
+        onQuery={setQuery}
+      >
         <NativeSelect
           className="h-7 border-0 bg-transparent text-xs"
           aria-label="Console level"
           value={level}
           onChange={(event) => setLevel(event.target.value)}
         >
-          <option value="all">All levels</option>
+          <option value="all">All levels ({entries.length})</option>
           {['log', 'info', 'warning', 'error', 'debug'].map((value) => (
-            <option key={value}>{value}</option>
+            <option key={value} value={value}>
+              {value} ({counts.get(value) ?? 0})
+            </option>
           ))}
         </NativeSelect>
       </FilterBar>
