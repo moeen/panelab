@@ -6,6 +6,7 @@ import { toPlaywrightKey } from '@/lib/keys'
 import { send } from '@/lib/store'
 import type { PreviewInput } from '../../shared/contracts'
 import { HighlightOverlay } from './highlight-overlay'
+import { SelectPicker } from './select-picker'
 
 export function PreviewCanvas({
   paneId,
@@ -25,6 +26,7 @@ export function PreviewCanvas({
   const stage = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
+  const focusInput = useCallback(() => input.current?.focus({ preventScroll: true }), [])
   const viewport = useRef({ width: 1, height: 1 })
   const composing = useRef(false)
   // Physical keys whose keydown was typed as text; their keyup must not reach Playwright either.
@@ -138,6 +140,8 @@ export function PreviewCanvas({
     const wheel = (event: WheelEvent) => {
       // Pinch and Command-scroll zoom the canvas; plain scrolling belongs to the website.
       if (event.ctrlKey || event.metaKey) return
+      // The select picker scrolls its own option list.
+      if (event.target instanceof Element && event.target.closest('[data-picker]')) return
       const position = point(event.clientX, event.clientY)
       if (!position) return
       event.preventDefault()
@@ -274,6 +278,7 @@ export function PreviewCanvas({
         }}
       />
       <HighlightOverlay paneId={paneId} />
+      <SelectPicker paneId={paneId} onClose={focusInput} />
       <textarea
         ref={input}
         className="preview-input"

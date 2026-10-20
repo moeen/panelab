@@ -7,7 +7,11 @@ import type { AppCommand } from '../../src/shared/contracts'
 const bridge = vi.hoisted(() => ({
   send: vi.fn<(command: AppCommand, quiet?: boolean) => Promise<boolean>>(async () => true),
 }))
-vi.mock('../../src/renderer/lib/store', () => ({ send: bridge.send, setInspector: vi.fn() }))
+vi.mock('../../src/renderer/lib/store', () => ({
+  send: bridge.send,
+  setInspector: vi.fn(),
+  usePicker: () => null,
+}))
 
 import { PreviewCanvas } from '../../src/renderer/features/preview-canvas'
 

@@ -185,6 +185,24 @@
   .pane-empty {
     @apply absolute inset-0 flex flex-col items-center justify-center;
   }
+  .select-picker {
+    @apply absolute z-10 max-h-[50%] max-w-full overflow-y-auto overscroll-contain rounded-md border border-border bg-background py-1 text-xs text-foreground shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+  .select-picker-heading {
+    @apply px-2.5 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground;
+  }
+  .select-picker-option {
+    @apply cursor-default truncate px-2.5 py-1;
+  }
+  .select-picker-option[aria-selected="true"] {
+    @apply font-semibold;
+  }
+  .select-picker-option[data-active] {
+    @apply bg-accent text-accent-foreground;
+  }
+  .select-picker-option[aria-disabled="true"] {
+    @apply text-muted-foreground opacity-60;
+  }
   .pane-loading {
     @apply pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-background px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm;
   }

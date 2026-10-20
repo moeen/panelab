@@ -57,7 +57,15 @@ There's no pane limit. Four to eight active previews is the intended range.
 
 Synchronization starts off. Turn it on from the toolbar and pick which actions to mirror: navigation, reload, clicks, typing, and scrolling. Exclude a pane from its settings menu.
 
-Clicks and typing find the same element in every pane by test id, id, name, label, text, then structural path. Typing also mirrors Escape, so dialogs and menus close everywhere. Scrolling uses relative positions. When a pane can't find a unique match, it skips the action and says so in its footer. If the skipped click navigated the source pane, for example a link hidden in a phone layout, that pane follows the new address instead.
+Clicks and typing find the same element in every pane by test id, id, name, label, text, then structural path. A text field matches across `<input>` and `<textarea>`, since sites sometimes serve one engine each. Scrolling uses relative positions. When a pane can't find a unique match, it skips the action and says so in its footer.
+
+Typing reaches other panes as the text it produces. Escape and Enter are mirrored too, so dialogs close and forms submit everywhere; Enter inside a multi-line field arrives as a newline instead. Outside text fields, Space, arrow keys, Home, End, Page Up, and Page Down are mirrored for listboxes, sliders, and carousels. Tab and shortcuts with Command, Control, or Option are not, because focus order and shortcuts differ between layouts and engines.
+
+Clicks also mirror HTML drag and drop. Drag libraries that move elements with pointer events instead aren't captured.
+
+When a click, Enter, or drop navigates the source pane within five seconds, for example a search that fetches results first, panes that couldn't repeat it load the new address instead. A pane that already got there stays put.
+
+Headless engines don't draw native dropdowns, so clicking a `<select>` opens PaneLab's own list over the preview. Choose with the pointer or arrow keys, Enter, and typeahead; Escape closes it. Arrow keys on a focused dropdown step through its options. Date, time, and color pickers, `<datalist>` suggestions, and dropdowns inside frames have no PaneLab picker; list-style selects (`multiple` or `size` above 1) work directly.
 
 ## Per-pane tools
 

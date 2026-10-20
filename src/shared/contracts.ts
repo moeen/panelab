@@ -10,6 +10,7 @@ import {
   type OverrideState,
   styleEditModes,
 } from './inspection'
+import { type PagePicker, pickerIdSchema, pickerIndexSchema } from './picker'
 
 export {
   type Engine,
@@ -215,6 +216,13 @@ export const commandSchema = z.discriminatedUnion('type', [
     text: z.string().max(10000),
   }),
   z.object({ type: z.literal('popup.close'), paneId: id }),
+  // A null index dismisses the picker and leaves the value unchanged.
+  z.object({
+    type: z.literal('picker.choose'),
+    paneId: id,
+    pickerId: pickerIdSchema,
+    index: pickerIndexSchema.nullable(),
+  }),
   z.object({ type: z.literal('style-edits.set'), mode: z.enum(styleEditModes) }),
   z.object({ type: z.literal('agent.access.set'), enabled: z.boolean() }),
   z.object({ type: z.literal('agent.cli.install') }),
@@ -292,6 +300,8 @@ export type AppEvent =
   | { type: 'sync'; paneId: string; message: string | null }
   // A null dialog with an id closes that dialog; without one it closes every dialog of the pane.
   | { type: 'dialog'; dialog: PageDialog | null; paneId: string; dialogId?: string }
+  // Null closes the pane's picker.
+  | { type: 'picker'; paneId: string; picker: PagePicker | null }
   | { type: 'notice'; message: string; error: boolean }
   | { type: 'agent'; status: AgentStatus }
   | {

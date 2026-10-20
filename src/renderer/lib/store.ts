@@ -11,6 +11,7 @@ import type {
   Workspace,
 } from '../../shared/contracts'
 import { engineLabels } from '../../shared/engines'
+import type { PagePicker } from '../../shared/picker'
 import type { BriefContext } from './agent-brief'
 import { receiveInspection, resetInspection } from './inspection'
 
@@ -50,6 +51,7 @@ const diagnosticSubscribers = new Map<string, Set<() => void>>()
 const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const emptyDiagnostics: DiagnosticState = { console: [], network: [], bodies: {}, sync: null }
 const pageDialogs = new Map<string, PageDialog>()
+const pickers = new Map<string, PagePicker>()
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | null = null
 let initialization: Promise<void> | null = null
@@ -148,6 +150,10 @@ function receive(event: AppEvent): void {
       for (const [id, dialog] of pageDialogs)
         if (dialog.paneId === event.paneId) pageDialogs.delete(id)
     update({ dialog: pageDialogs.values().next().value ?? null })
+  } else if (event.type === 'picker') {
+    if (event.picker) pickers.set(event.paneId, event.picker)
+    else pickers.delete(event.paneId)
+    for (const listener of paneSubscribers.get(event.paneId) ?? []) listener()
   } else if (event.type === 'shortcut') {
     if (event.action === 'settings') setEngineSettings(true)
     else window.dispatchEvent(new CustomEvent('panelab:shortcut', { detail: event.action }))
@@ -240,6 +246,13 @@ export function usePane(id: string | null): PaneState | null {
   return useSyncExternalStore(
     (listener) => (id ? subscribePane(id, listener) : () => {}),
     () => (id ? (paneStates.get(id) ?? null) : null),
+  )
+}
+// The select picker a pane's website opened; PaneLab draws it because headless engines can't.
+export function usePicker(id: string): PagePicker | null {
+  return useSyncExternalStore(
+    (listener) => subscribePane(id, listener),
+    () => pickers.get(id) ?? null,
   )
 }
 const canGoBack = 1

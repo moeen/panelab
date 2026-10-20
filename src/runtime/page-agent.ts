@@ -90,75 +90,254 @@ export function installPageAgent(options: PageAgentOptions): void {
   }
 
   // Synchronization capture: trusted user input becomes semantic actions for followers.
+  const eventElement = (event: Event) =>
+    event.composedPath().find((node): node is Element => node instanceof Element) ?? null
+  const isPage = (element: Element | null) =>
+    !element || element === document.body || element === document.documentElement
+  // Native popups of dropdown selects are never streamed; PaneLab opens its own picker instead.
+  const pickable = (element: Element | null | undefined): element is HTMLSelectElement =>
+    window === window.top &&
+    element instanceof HTMLSelectElement &&
+    !element.multiple &&
+    element.size <= 1 &&
+    !element.disabled
+  // Enter or Space on these produces a trusted click, which synchronizes on its own.
+  const clickActivated =
+    'a[href],button,summary,input:is([type="button"],[type="submit"],[type="reset"],[type="image"],[type="checkbox"],[type="radio"])'
+  const nonTextInputs = new Set([
+    'button',
+    'checkbox',
+    'color',
+    'file',
+    'hidden',
+    'image',
+    'radio',
+    'range',
+    'reset',
+    'submit',
+  ])
+  const editsText = (element: Element | null) =>
+    element instanceof HTMLTextAreaElement ||
+    (element instanceof HTMLInputElement && !nonTextInputs.has(element.type)) ||
+    (element instanceof HTMLElement && element.isContentEditable)
+  // In multi-line fields Enter inserts a newline, which the input action already carries.
+  const multiline = (element: Element | null) =>
+    element instanceof HTMLTextAreaElement ||
+    (element instanceof HTMLElement && element.isContentEditable)
+  // Outside text fields these keys scroll, move, or activate; inside them they only move the caret.
+  const commandKeys = new Set([
+    ' ',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'Home',
+    'End',
+    'PageUp',
+    'PageDown',
+  ])
+  // Escape and Enter replay; text editing reaches followers as input actions instead.
+  const replayedKey = (key: string, element: Element | null) => {
+    if (key === 'Escape') return true
+    if ((key === 'Enter' || key === ' ') && element?.closest(clickActivated)) return false
+    if (key === 'Enter') return !multiline(element)
+    return commandKeys.has(key) && !editsText(element)
+  }
+  // Enter in a form field submits through a keyboard click (detail 0) on the default button.
+  let activationAt = Number.NEGATIVE_INFINITY
+
   document.addEventListener(
     'click',
     (event) => {
       if (!event.isTrusted || event.button !== 0) return
-      const element = event.composedPath().find((node): node is Element => node instanceof Element)
+      if (event.detail === 0 && event.timeStamp - activationAt < 500) return
+      const element = eventElement(event)
       const target =
         element?.closest(
           'a,button,input,select,textarea,summary,[role="button"],[role="link"],[contenteditable]',
         ) ?? element
+      // Selects open PaneLab's picker and synchronize the value they end up with.
+      if (pickable(target)) return
       // Replaying a click on the page background would hit whatever sits at a follower's center.
-      if (target && target !== document.documentElement && target !== document.body)
-        post({ kind: 'click', selectors: identify(target, false) })
+      if (target && !isPage(target)) post({ kind: 'click', selectors: identify(target, false) })
     },
     true,
   )
+  const inputAction = (
+    element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLElement,
+  ) => ({
+    kind: 'input',
+    selectors: identify(element, false),
+    value:
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+        ? element.value
+        : element.innerText,
+    checked:
+      element instanceof HTMLInputElement && ['checkbox', 'radio'].includes(element.type)
+        ? element.checked
+        : null,
+    selectionStart:
+      element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.selectionStart
+        : null,
+    selectionEnd:
+      element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.selectionEnd
+        : null,
+  })
   const onInput = (event: Event) => {
     if (!event.isTrusted) return
-    const element = event.composedPath().find((node): node is Element => node instanceof Element)
+    const element = eventElement(event)
     if (
-      !(
-        element instanceof HTMLInputElement ||
-        element instanceof HTMLTextAreaElement ||
-        element instanceof HTMLSelectElement ||
-        (element instanceof HTMLElement && element.isContentEditable)
-      )
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement ||
+      (element instanceof HTMLElement && element.isContentEditable)
     )
-      return
+      post(inputAction(element))
+  }
+
+  let pickerSequence = 0
+  let openPicker: { id: string; select: HTMLSelectElement } | null = null
+  const groupOf = (option: HTMLOptionElement) =>
+    option.parentElement instanceof HTMLOptGroupElement ? option.parentElement : null
+  const unavailable = (option: HTMLOptionElement) =>
+    option.disabled || Boolean(groupOf(option)?.disabled)
+  const clean = (value: string) => value.trim().replace(/\s+/g, ' ').slice(0, 200)
+  const showPicker = (select: HTMLSelectElement) => {
+    select.focus({ preventScroll: true })
+    const options = Array.from(select.options).slice(0, 500)
+    if (!options.length) return
+    const id = `${documentId}p${++pickerSequence}`
+    openPicker = { id, select }
+    const box = boxModel(select)
     post({
-      kind: 'input',
-      selectors: identify(element, false),
-      value:
-        element instanceof HTMLInputElement ||
-        element instanceof HTMLTextAreaElement ||
-        element instanceof HTMLSelectElement
-          ? element.value
-          : element.innerText,
-      checked:
-        element instanceof HTMLInputElement && ['checkbox', 'radio'].includes(element.type)
-          ? element.checked
-          : null,
-      selectionStart:
-        element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
-          ? element.selectionStart
-          : null,
-      selectionEnd:
-        element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
-          ? element.selectionEnd
-          : null,
+      kind: 'picker',
+      picker: {
+        id,
+        label: clean(
+          select.getAttribute('aria-label') ?? select.labels?.[0]?.textContent ?? select.name,
+        ),
+        options: options.map((option) => {
+          const group = groupOf(option)
+          return {
+            label: clean(option.label || option.text),
+            group: group ? clean(group.label) : null,
+            disabled: unavailable(option),
+          }
+        }),
+        selectedIndex: select.selectedIndex < options.length ? select.selectedIndex : -1,
+        rect: box.border,
+        viewport: box.viewport,
+      },
     })
   }
-  // Escape dismisses dialogs and menus; other keys reach followers as the input they produce.
+  // Script-driven changes are untrusted, so the agent reports the resulting value itself.
+  const commitSelect = (select: HTMLSelectElement, index: number) => {
+    const option = select.options[index]
+    if (!option || unavailable(option) || select.selectedIndex === index) return
+    select.selectedIndex = index
+    select.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    post(inputAction(select))
+  }
+  const stepSelect = (select: HTMLSelectElement, key: string) => {
+    const enabled = Array.from(select.options, (option, index) =>
+      unavailable(option) ? -1 : index,
+    ).filter((index) => index >= 0)
+    const position = enabled.indexOf(select.selectedIndex)
+    const next =
+      key === 'Home'
+        ? enabled[0]
+        : key === 'End'
+          ? enabled.at(-1)
+          : key === 'ArrowDown'
+            ? enabled[position + 1]
+            : enabled[position < 0 ? enabled.length - 1 : position - 1]
+    if (next !== undefined) commitSelect(select, next)
+  }
+  document.addEventListener(
+    'mousedown',
+    (event) => {
+      if (!event.isTrusted || event.button !== 0) return
+      const select = eventElement(event)?.closest('select')
+      if (!pickable(select)) return
+      event.preventDefault()
+      showPicker(select)
+    },
+    true,
+  )
+
   document.addEventListener(
     'keydown',
     (event) => {
-      if (!event.isTrusted || event.key !== 'Escape' || event.repeat) return
-      const element = event.composedPath().find((node): node is Element => node instanceof Element)
+      if (!event.isTrusted || event.repeat) return
+      const element = eventElement(event)
+      if (pickable(element)) {
+        const modified = event.ctrlKey || event.metaKey
+        if (
+          !modified &&
+          (['Enter', ' ', 'F4'].includes(event.key) ||
+            (event.altKey && ['ArrowDown', 'ArrowUp'].includes(event.key)))
+        ) {
+          event.preventDefault()
+          showPicker(element)
+          return
+        }
+        if (
+          !modified &&
+          !event.altKey &&
+          ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)
+        ) {
+          event.preventDefault()
+          stepSelect(element, event.key)
+          return
+        }
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      if (!replayedKey(event.key, element)) return
+      if (event.key === 'Enter' || event.key === ' ') activationAt = event.timeStamp
       post({
         kind: 'key',
         key: event.key,
-        selectors:
-          element && element !== document.body && element !== document.documentElement
-            ? identify(element, false)
-            : [],
+        selectors: isPage(element) || !element ? [] : identify(element, false),
       })
     },
     true,
   )
   document.addEventListener('input', onInput, true)
   document.addEventListener('change', onInput, true)
+
+  // HTML drag and drop replays as one action; pointer-driven drag libraries are not captured.
+  let dragSource: Element | null = null
+  document.addEventListener(
+    'dragstart',
+    (event) => {
+      if (!event.isTrusted) return
+      const element = eventElement(event)
+      dragSource = element?.closest('[draggable="true"]') ?? element
+    },
+    true,
+  )
+  document.addEventListener(
+    'drop',
+    (event) => {
+      const target = eventElement(event)
+      if (event.isTrusted && dragSource?.isConnected && target && !isPage(target))
+        post({
+          kind: 'drag',
+          selectors: identify(dragSource, false),
+          target: identify(target, false),
+        })
+      dragSource = null
+    },
+    true,
+  )
+  document.addEventListener('dragend', () => {
+    dragSource = null
+  })
   let scrollTimer: ReturnType<typeof setTimeout> | undefined
   let scrollTarget: EventTarget | null = null
   document.addEventListener(
@@ -811,6 +990,15 @@ export function installPageAgent(options: PageAgentOptions): void {
     scan,
     supports: (args: { properties: string[] }) =>
       args.properties.filter((property) => !CSS.supports(property, 'initial')),
+    // Applies a choice from PaneLab's picker; a stale picker or a removed select changes nothing.
+    choosePicker: (args: { id: string; index: number | null }) => {
+      const picker = openPicker
+      if (picker?.id !== args.id || !picker.select.isConnected) return false
+      openPicker = null
+      picker.select.focus({ preventScroll: true })
+      if (args.index !== null) commitSelect(picker.select, args.index)
+      return true
+    },
   }
   Object.defineProperty(window, options.key, { value: Object.freeze(api) })
 }

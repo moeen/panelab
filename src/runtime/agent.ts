@@ -168,6 +168,9 @@ export class PageAgentClient {
   unsupported(properties: string[]): Promise<string[]> {
     return this.call(propertiesSchema, 'supports', { properties })
   }
+  choosePicker(id: string, index: number | null): Promise<boolean> {
+    return this.call(z.boolean(), 'choosePicker', { id, index })
+  }
 }
 
 export const highlightMessageSchema = z.object({

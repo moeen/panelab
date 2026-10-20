@@ -38,6 +38,21 @@ export const appReportSchema = z.object({
   boxes: z.record(z.string(), boxSchema),
 })
 export type AppReport = z.infer<typeof appReportSchema>
+export const syncReportSchema = z.object({
+  pane: z.string(),
+  path: z.string(),
+  history: z.number(),
+  todos: z.array(z.string()),
+  keys: z.array(z.string()),
+  notes: z.string(),
+  query: z.string(),
+  order: z.string(),
+  size: z.string(),
+  color: z.number(),
+  focused: z.string(),
+  boxes: z.record(z.string(), boxSchema),
+})
+export type SyncReport = z.infer<typeof syncReportSchema>
 
 export async function startSite() {
   const reports = new Map<string, Report>()
@@ -46,6 +61,10 @@ export async function startSite() {
   const inspect = await readFile(new URL('./inspect.html', import.meta.url), 'utf8')
   const app = await readFile(new URL('./app.html', import.meta.url), 'utf8')
   const appReports = new Map<string, AppReport>()
+  const sync = await readFile(new URL('./sync.html', import.meta.url), 'utf8')
+  const syncReports = new Map<string, SyncReport>()
+  // Form submissions per pane, to prove synchronized Enter never submits twice.
+  const submissions = new Map<string, number>()
   const server = createServer((request, response) => {
     requests++
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
@@ -80,6 +99,24 @@ export async function startSite() {
       })().catch(() => {
         if (!response.headersSent) response.writeHead(400).end()
       })
+    } else if (url.pathname === '/report-sync') {
+      void (async () => {
+        let body = ''
+        for await (const chunk of request) body += String(chunk)
+        const parsed = syncReportSchema.parse(JSON.parse(body))
+        syncReports.set(parsed.pane, parsed)
+        response.writeHead(204).end()
+      })().catch(() => {
+        if (!response.headersSent) response.writeHead(400).end()
+      })
+    } else if (url.pathname.startsWith('/sync')) {
+      if (url.pathname === '/sync/submitted') {
+        const pane = url.searchParams.get('pane') ?? ''
+        submissions.set(pane, (submissions.get(pane) ?? 0) + 1)
+      }
+      response
+        .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+        .end(sync)
     } else if (url.pathname.startsWith('/app')) {
       response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }).end(app)
     } else if (url.pathname === '/download') {
@@ -135,6 +172,8 @@ export async function startSite() {
     url: `http://127.0.0.1:${address.port}`,
     reports,
     appReports,
+    syncReports,
+    submissions,
     requests: () => requests,
     close: async () => {
       server.closeAllConnections()

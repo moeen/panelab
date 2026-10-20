@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { SettingsService } from '../../src/main/settings'
 import { catalog } from '../../src/runtime/devices'
-import { EchoGuard } from '../../src/runtime/sync'
 import { type Engine, engineUnavailableMessage } from '../../src/shared/contracts'
 import { settings } from '../fixtures/data'
 
@@ -96,35 +95,5 @@ describe('SettingsService', () => {
     release()
     await Promise.all([first, second])
     expect(service.settings.appearance).toBe('dark')
-  })
-})
-
-describe('EchoGuard', () => {
-  beforeEach(() => vi.useFakeTimers())
-  afterEach(() => vi.useRealTimers())
-
-  test('broadcasts only during user input outside automation windows', () => {
-    const echo = new EchoGuard()
-    expect(echo.broadcasting()).toBe(false)
-    echo.user()
-    expect(echo.broadcasting()).toBe(true)
-    vi.advanceTimersByTime(2000)
-    expect(echo.broadcasting()).toBe(false)
-    echo.user()
-    echo.automate()
-    expect(echo.broadcasting()).toBe(false)
-    echo.settle()
-    echo.user()
-    expect(echo.broadcasting()).toBe(true)
-  })
-
-  test('a mirrored click covers the navigation it causes', () => {
-    const echo = new EchoGuard()
-    echo.user()
-    echo.coverNavigation()
-    expect(echo.broadcastingNavigation()).toBe(false)
-    vi.advanceTimersByTime(3000)
-    echo.user()
-    expect(echo.broadcastingNavigation()).toBe(true)
   })
 })

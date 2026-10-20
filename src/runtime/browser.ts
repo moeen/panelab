@@ -26,7 +26,8 @@ import {
   type RuntimeReply,
   type Workspace,
 } from '../shared/contracts'
-import { highlightMessageSchema } from './agent'
+import { pickerMessageSchema } from '../shared/picker'
+import { highlightMessageSchema, PageAgentClient } from './agent'
 import { catalog, recoverDevices, resolveDevice } from './devices'
 import { Diagnostics } from './diagnostics'
 import { readHistory } from './history'
@@ -35,6 +36,7 @@ import { installPageAgent } from './page-agent'
 import { SharedSession } from './session'
 import { FrameStream } from './stream'
 import {
+  activationKeys,
   EchoGuard,
   matchingFrame,
   replayAction,
@@ -59,15 +61,17 @@ type Entry = {
   heldButtons: Set<'left' | 'middle' | 'right'>
   pendingSync: Map<string, { frame: Frame; action: SyncAction }>
   syncRunning: boolean
-  // Per follower: whether it replayed this pane's latest click, which then drives its navigation.
-  clickReplays: Map<string, Promise<boolean>>
+  // Per follower: whether it replayed this pane's latest activation, which then drives its navigation.
+  intentReplays: Map<string, Promise<boolean>>
+  // The id of the select picker this pane's page has open, if any.
+  picker: string | null
   historyProbe: number
   disposed: boolean
   profileFingerprint: string
 }
 
 const removedMessage = 'This preview was removed.'
-const pageMessageSchema = z.union([syncActionSchema, highlightMessageSchema])
+const pageMessageSchema = z.union([syncActionSchema, highlightMessageSchema, pickerMessageSchema])
 
 export class BrowserRuntime {
   private availableEngines = new Set<Engine>()
@@ -191,7 +195,8 @@ export class BrowserRuntime {
       heldButtons: new Set(),
       pendingSync: new Map(),
       syncRunning: false,
-      clickReplays: new Map(),
+      intentReplays: new Map(),
+      picker: null,
       historyProbe: 0,
       disposed: false,
       profileFingerprint: JSON.stringify(this.profiles.get(config.deviceId)),
@@ -243,6 +248,12 @@ export class BrowserRuntime {
         if (message.data.kind === 'highlight') {
           if (source.frame === source.page.mainFrame())
             this.inspection.pageMessage(entry.config.id, message.data)
+        } else if (message.data.kind === 'picker') {
+          // Only the user's own input opens a picker; replayed clicks never do.
+          if (source.frame === source.page.mainFrame() && entry.echo.broadcasting()) {
+            entry.picker = message.data.picker.id
+            this.emit({ type: 'picker', paneId: entry.config.id, picker: message.data.picker })
+          }
         } else if (entry.echo.broadcasting())
           await this.synchronize(entry, source.frame, message.data)
       })
@@ -281,6 +292,7 @@ export class BrowserRuntime {
     const previous = entry.page
     if (previous && previous !== page && !previous.isClosed())
       void previous.screencast.stop().catch(() => {})
+    this.closePicker(entry)
     entry.pages.push(page)
     entry.page = page
     entry.diagnostics.attach(page)
@@ -289,34 +301,36 @@ export class BrowserRuntime {
       if (frame !== page.mainFrame() || page !== entry.page || frame.url() === 'about:blank') return
       const url = frame.url()
       entry.config.url = url
+      this.closePicker(entry)
       entry.diagnostics.reset()
       this.inspection.navigated(entry.config.id)
       this.session.touch(page.context())
       this.update(entry, { url, status: 'loading', error: null })
       this.probeHistory(entry, page)
+      const mode = entry.echo.navigationMode()
       if (
         this.workspace?.sync.enabled &&
         this.workspace.sync.navigation &&
         !entry.config.excluded &&
-        entry.echo.broadcasting() &&
+        mode !== 'ignore' &&
         /^https?:/.test(url)
-      ) {
-        // A replayed click navigates its follower; followers that couldn't replay it follow the URL.
-        const covered = !entry.echo.broadcastingNavigation()
+      )
         for (const follower of this.followers(entry)) {
-          const replayed = covered && entry.clickReplays.get(follower.config.id)
+          // A replayed activation navigates its follower; the rest follow the URL.
+          const replayed = mode === 'replayed' && entry.intentReplays.get(follower.config.id)
           void Promise.resolve(replayed)
             .then((matched) => {
               if (matched) return
               follower.echo.automate()
               return this.enqueue(follower, async () => {
+                // A follower that already arrived, by its own replay or redirect, stays put.
+                if (follower.page?.url() === url) return follower.echo.settle()
                 await this.open(follower)
                 await this.navigate(follower, url, true)
               })
             })
             .catch(() => {})
         }
-      }
     })
     page.on('domcontentloaded', () => {
       if (page !== entry.page || entry.disposed) return
@@ -360,6 +374,7 @@ export class BrowserRuntime {
     page.on('close', () => {
       entry.pages = entry.pages.filter((item) => item !== page && !item.isClosed())
       if (entry.disposed || entry.page !== page) return
+      this.closePicker(entry)
       entry.stream.invalidate()
       entry.page = entry.pages.at(-1) ?? null
       if (entry.page && /^https?:/.test(entry.page.url())) entry.config.url = entry.page.url()
@@ -395,23 +410,26 @@ export class BrowserRuntime {
     if (
       !sync?.enabled ||
       source.config.excluded ||
-      (action.kind === 'click' && !sync.clicks) ||
+      ((action.kind === 'click' || action.kind === 'drag') && !sync.clicks) ||
       ((action.kind === 'input' || action.kind === 'key') && !sync.typing) ||
       (action.kind === 'scroll' && !sync.scroll)
     )
       return
-    if (action.kind === 'click') {
-      source.echo.coverNavigation()
-      source.clickReplays = new Map()
+    const activation =
+      action.kind === 'click' ||
+      action.kind === 'drag' ||
+      (action.kind === 'key' && activationKeys.has(action.key))
+    if (activation) {
+      source.echo.intend()
+      source.intentReplays = new Map()
     }
     for (const follower of this.followers(source)) {
-      if (action.kind === 'click') {
-        source.clickReplays.set(
-          follower.config.id,
-          this.enqueue(follower, () => this.replay(follower, frame, action)).catch(() => false),
+      // Discrete actions queue behind the coalesced input drain, so typing lands before Enter.
+      if (action.kind === 'click' || action.kind === 'key' || action.kind === 'drag') {
+        const replayed = this.enqueue(follower, () => this.replay(follower, frame, action)).catch(
+          () => false,
         )
-      } else if (action.kind === 'key') {
-        void this.enqueue(follower, () => this.replay(follower, frame, action)).catch(() => {})
+        if (activation) source.intentReplays.set(follower.config.id, replayed)
       } else {
         // Latest values win while a slow follower finishes its preceding action.
         follower.pendingSync.set(action.kind, { frame, action })
@@ -573,8 +591,14 @@ export class BrowserRuntime {
       }
     } else await this.release(entry)
   }
+  private closePicker(entry: Entry): void {
+    if (entry.picker === null) return
+    entry.picker = null
+    this.emit({ type: 'picker', paneId: entry.config.id, picker: null })
+  }
   private async closeEntry(entry: Entry): Promise<void> {
     if (entry.disposed) return
+    this.closePicker(entry)
     entry.disposed = true
     entry.pendingSync.clear()
     entry.stream.release()
@@ -809,6 +833,22 @@ export class BrowserRuntime {
         })
       }
       return { ok: true }
+    }
+    if (command.type === 'picker.choose') {
+      for (const item of this.entries.values()) item.stream.activity()
+      return this.enqueue(entry, async () => {
+        // A picker replaced by a newer one or closed by navigation no longer applies.
+        if (entry.picker !== command.pickerId) return { ok: true }
+        this.closePicker(entry)
+        const page = entry.page
+        if (!page || page.isClosed() || !entry.agentKey) return { ok: true }
+        entry.echo.user()
+        await new PageAgentClient(page.mainFrame(), entry.agentKey).choosePicker(
+          command.pickerId,
+          command.index,
+        )
+        return { ok: true }
+      })
     }
     if (command.type === 'file.choose') {
       const chooser = this.choosers.get(command.paneId)

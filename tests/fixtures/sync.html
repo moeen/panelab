@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PaneLab sync fixture</title>
+    <style>
+      body { margin: 8px; font: 14px sans-serif }
+      section { margin: 6px 0 }
+      .box { display: inline-block; width: 80px; height: 40px; margin-right: 8px; border: 1px solid; text-align: center; line-height: 40px }
+      [role="listbox"] { display: inline-block; padding: 4px; border: 1px solid }
+      [aria-selected="true"] { background: #cde }
+    </style>
+  </head>
+  <body>
+    <!-- Framework-style markup: interactive elements are identified by labels and structure. -->
+    <section>
+      <input aria-label="New todo" placeholder="What needs to be done?" />
+      <ul class="todos"></ul>
+    </section>
+    <section><textarea aria-label="Notes"></textarea></section>
+    <section class="query"></section>
+    <section><input aria-label="Search docs" /></section>
+    <section>
+      <form action="/sync/submitted">
+        <input type="hidden" name="pane" />
+        <input aria-label="First name" name="first" />
+        <button type="submit">Submit</button>
+      </form>
+    </section>
+    <section class="columns">
+      <div class="box" draggable="true">A</div><div class="box" draggable="true">B</div>
+    </section>
+    <section>
+      <select aria-label="Size">
+        <option>Small</option>
+        <optgroup label="Large">
+          <option>Large</option>
+          <option disabled>Huge</option>
+        </optgroup>
+        <option>Medium</option>
+      </select>
+    </section>
+    <section>
+      <div role="listbox" tabindex="0" aria-label="Colors">
+        <div role="option" tabindex="-1">Red</div><div role="option" tabindex="-1">Green</div><div role="option" tabindex="-1">Blue</div>
+      </div>
+    </section>
+    <script>
+      const parameters = new URLSearchParams(location.search)
+      if (parameters.has('pane')) sessionStorage.setItem('pane', parameters.get('pane'))
+      if (parameters.has('compact')) sessionStorage.setItem('compact', '1')
+      const pane = sessionStorage.getItem('pane') || ''
+      // One engine may serve a field as <textarea> and another as <input>, like Google search.
+      document.querySelector('.query').innerHTML = sessionStorage.getItem('compact')
+        ? '<input name="q" />'
+        : '<textarea name="q"></textarea>'
+      document.querySelector('[name="pane"]').value = pane
+      // A follower without this field can't replay the Enter and must follow the URL instead.
+      if (sessionStorage.getItem('compact')) document.querySelector('[aria-label="Search docs"]').hidden = true
+      const todo = document.querySelector('[aria-label="New todo"]')
+      const todos = []
+      const keys = []
+      const colors = [...document.querySelectorAll('[role="option"]')]
+      let color = 0
+      const box = (element) => {
+        const rect = element.getBoundingClientRect()
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      }
+      const report = () =>
+        fetch('/report-sync', { method: 'POST', body: JSON.stringify({
+          pane, path: location.pathname, history: history.length, todos: todos.slice(), keys: keys.slice(),
+          notes: document.querySelector('[aria-label="Notes"]').value,
+          query: document.querySelector('[name="q"]').value,
+          order: [...document.querySelectorAll('.box')].map((item) => item.textContent).join(''),
+          size: document.querySelector('[aria-label="Size"]').value,
+          color,
+          focused: document.activeElement?.getAttribute('aria-label') ?? '',
+          boxes: Object.fromEntries(
+            [['todo', todo], ['notes', '[aria-label="Notes"]'], ['query', '[name="q"]'], ['search', '[aria-label="Search docs"]'],
+             ['first', '[aria-label="First name"]'], ['a', '.box:nth-of-type(1)'], ['b', '.box:nth-of-type(2)'],
+             ['size', '[aria-label="Size"]'], ['colors', '[role="listbox"]']]
+              .map(([name, target]) => [name, box(typeof target === 'string' ? document.querySelector(target) : target)])),
+        }) })
+      todo.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || !todo.value.trim()) return
+        todos.push(todo.value.trim())
+        todo.value = ''
+        void report()
+      })
+      // Like sites that fetch results before routing, this navigates well after the key press.
+      document.querySelector('[aria-label="Search docs"]').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter')
+          setTimeout(() => { location.href = `/sync/result?q=${encodeURIComponent(event.target.value)}` }, 2500)
+      })
+      document.querySelector('[role="listbox"]').addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') color = Math.min(colors.length - 1, color + 1)
+        else if (event.key === 'ArrowUp') color = Math.max(0, color - 1)
+        else return
+        event.preventDefault()
+        for (const [index, item] of colors.entries()) item.setAttribute('aria-selected', String(index === color))
+        void report()
+      })
+      const columns = document.querySelector('.columns')
+      let dragged = null
+      columns.addEventListener('dragstart', (event) => { dragged = event.target })
+      columns.addEventListener('dragover', (event) => event.preventDefault())
+      columns.addEventListener('drop', (event) => {
+        event.preventDefault()
+        const target = event.target.closest('.box')
+        if (!dragged || !target || target === dragged) return
+        const [first, second] = [...columns.children]
+        columns.append(second, first)
+        void report()
+      })
+      document.addEventListener('keydown', (event) => { keys.push(event.key) }, true)
+      document.addEventListener('keyup', () => void report())
+      document.addEventListener('input', () => void report())
+      document.addEventListener('change', () => void report())
+      void report()
+    </script>
+  </body>
+</html>
