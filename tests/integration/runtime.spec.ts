@@ -203,6 +203,32 @@ test('shared navigation and reload affect excluded panes with sync disabled', as
   expect(site.requests()).toBeGreaterThanOrEqual(before + 3)
 })
 
+test('a website popup opens inside its own preview and closes back to the opener', async ({
+  runtime,
+  site,
+  states,
+}) => {
+  await expect
+    .poll(() => [...site.reports.values()].find((item) => item.pane === 'source')?.boxes.popup)
+    .toBeTruthy()
+  const source = [...site.reports.values()].find((item) => item.pane === 'source')
+  if (!source?.boxes.popup) throw new Error('Fixture not ready')
+  await click(runtime, 'source', source.boxes.popup)
+  await expect.poll(() => states.get('source')?.popup).toBe(true)
+  await expect.poll(() => states.get('source')?.url).toBe(`${site.url}/popup`)
+  expect(states.size).toBe(3)
+  for (const id of ['follower', 'excluded']) {
+    expect(states.get(id)?.popup).toBe(false)
+    expect(states.get(id)?.url).toBe(`${site.url}/?pane=${id}`)
+  }
+  expect(await runtime.execute({ type: 'popup.close', paneId: 'source' })).toEqual({ ok: true })
+  await expect.poll(() => states.get('source')?.popup).toBe(false)
+  expect(states.get('source')?.url).toBe(`${site.url}/?pane=source`)
+  // Closing again keeps the original page.
+  expect(await runtime.execute({ type: 'popup.close', paneId: 'source' })).toEqual({ ok: true })
+  expect(states.get('source')?.url).toBe(`${site.url}/?pane=source`)
+})
+
 test('changes emulation without losing supported storage or hidden capture', async ({
   runtime,
   workspace,

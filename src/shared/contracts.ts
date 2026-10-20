@@ -452,6 +452,13 @@ export const defaultSync: SyncSettings = {
 export function normalizeUrl(value: string): string {
   const input = value.trim()
   if (!input) throw new Error('Enter a website URL first.')
+  if (
+    /^[a-z][a-z\d+.-]*:/i.test(input) &&
+    !/^https?:/i.test(input) &&
+    // `host:port` looks like a scheme but is a bare address.
+    !/^[^/:]+:\d+([/?#]|$)/.test(input)
+  )
+    throw new Error('Only HTTP and HTTPS websites are supported.')
   const candidate = /^https?:\/\//i.test(input)
     ? input
     : /^(([\w-]+\.)*localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(input)
@@ -460,13 +467,6 @@ export function normalizeUrl(value: string): string {
   const url = new URL(candidate)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
     throw new Error('Use an HTTP or HTTPS URL without embedded credentials.')
-  if (
-    /^[a-z][a-z\d+.-]*:/i.test(input) &&
-    !/^https?:/i.test(input) &&
-    // `host:port` looks like a scheme but is a bare address.
-    !/^[^/:]+:\d+([/?#]|$)/.test(input)
-  )
-    throw new Error('Only HTTP and HTTPS websites are supported.')
   return url.href
 }
 

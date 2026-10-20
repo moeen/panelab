@@ -27,16 +27,22 @@ describe('website URL boundary', () => {
     ['example.com:8080/a', 'https://example.com:8080/a'],
     ['app.localhost:3000', 'http://app.localhost:3000/'],
   ])('%s normalizes to %s', (input, expected) => expect(normalizeUrl(input)).toBe(expected))
+  test.each(['', ' ', 'https://user:password@example.com', 'http://[broken'])(
+    'rejects %j',
+    (input) => expect(() => normalizeUrl(input)).toThrow(),
+  )
   test.each([
-    '',
-    ' ',
     'file:///etc/passwd',
     'javascript:alert(1)',
     'data:text/html,x',
     'ftp://example.com',
-    'https://user:password@example.com',
-    'http://[broken',
-  ])('rejects %j', (input) => expect(() => normalizeUrl(input)).toThrow())
+    'mailto:person@example.com',
+    'chrome://settings',
+    'smb://share/folder',
+    'custom-app://open',
+  ])('explains that %j is not a website address', (input) =>
+    expect(() => normalizeUrl(input)).toThrow('Only HTTP and HTTPS websites are supported.'),
+  )
 })
 
 describe('validated external input', () => {

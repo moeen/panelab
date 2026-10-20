@@ -183,7 +183,7 @@ export function DeviceEditor({
                 type="number"
                 min={0.5}
                 max={4}
-                step={0.1}
+                step="any"
                 required
                 value={device.deviceScaleFactor}
                 onChange={(event) =>

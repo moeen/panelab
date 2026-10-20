@@ -63,6 +63,26 @@ describe('Lab', () => {
     expect(panes[0]?.synthetic).toBe(true)
   })
 
+  test('a rejected open leaves the current previews and website untouched', async () => {
+    const fake = fakeBackend()
+    const lab = new Lab(fake.backend)
+    await lab.call({ op: 'open', url: 'example.com', devices: ['pixel-7'] })
+    const before = fake.workspace()
+    const sent = fake.commands.length
+    await expect(
+      lab.call({ op: 'open', url: 'other.test', devices: ['macbook-air-13', 'zzz'], keep: true }),
+    ).rejects.toThrow(/zzz/)
+    await expect(
+      lab.call({
+        op: 'open',
+        url: 'other.test',
+        devices: ['macbook-air-13', 'iphone-16@chromium'],
+      }),
+    ).rejects.toThrow(/synthetic: true/)
+    expect(fake.workspace()).toBe(before)
+    expect(fake.commands).toHaveLength(sent)
+  })
+
   test('defaults each device to its own engine, falling back to an available one', async () => {
     const lab = new Lab(fakeBackend({ available: ['chromium'] }).backend)
     const panes = await lab.call({ op: 'open', url: 'example.com', devices: ['macbook-air-13'] })
