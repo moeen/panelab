@@ -33,6 +33,10 @@ export function PreviewCanvas({
   const textKeys = useRef(new Set<string>())
   const pendingMove = useRef<{ x: number; y: number } | null>(null)
   const moveBusy = useRef(false)
+  const pendingScroll = useRef<{ x: number; y: number; deltaX: number; deltaY: number } | null>(
+    null,
+  )
+  const scrollBusy = useRef(false)
   const flow = useStoreApi()
   // Element picking takes the pointer from the website until a selection or Escape.
   const picking = useInspection((value) => value.picking) && enabled
@@ -58,6 +62,27 @@ export function PreviewCanvas({
       y: Math.max(0, Math.min(viewport.current.height - 1, y)),
     }
   }, [])
+  // Engines take tens of milliseconds per wheel step, so deltas accumulate while one is in flight
+  // instead of queueing behind it and replaying long after the gesture ends.
+  const scroll = useCallback(
+    async (position: { x: number; y: number }, deltaX: number, deltaY: number) => {
+      const pending = pendingScroll.current
+      pendingScroll.current = {
+        ...position,
+        deltaX: (pending?.deltaX ?? 0) + deltaX,
+        deltaY: (pending?.deltaY ?? 0) + deltaY,
+      }
+      if (scrollBusy.current) return
+      scrollBusy.current = true
+      while (pendingScroll.current) {
+        const next = pendingScroll.current
+        pendingScroll.current = null
+        await send({ type: 'input', paneId, input: { kind: 'scroll', ...next } }, true)
+      }
+      scrollBusy.current = false
+    },
+    [paneId],
+  )
   useEffect(() => {
     let disposed = false
     let drawing = Promise.resolve()
@@ -135,8 +160,6 @@ export function PreviewCanvas({
   useEffect(() => {
     const container = stage.current
     if (!container || !enabled) return
-    let frame = 0
-    let pending = { x: 0, y: 0, deltaX: 0, deltaY: 0 }
     const wheel = (event: WheelEvent) => {
       // Pinch and Command-scroll zoom the canvas; plain scrolling belongs to the website.
       if (event.ctrlKey || event.metaKey) return
@@ -149,25 +172,11 @@ export function PreviewCanvas({
       onActivate()
       const factor =
         event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.current.height : 1
-      pending = {
-        ...position,
-        deltaX: pending.deltaX + event.deltaX * factor,
-        deltaY: pending.deltaY + event.deltaY * factor,
-      }
-      if (!frame)
-        frame = requestAnimationFrame(() => {
-          frame = 0
-          void send({ type: 'input', paneId, input: { kind: 'scroll', ...pending } }, true)
-          pending.deltaX = 0
-          pending.deltaY = 0
-        })
+      void scroll(position, event.deltaX * factor, event.deltaY * factor)
     }
     container.addEventListener('wheel', wheel, { passive: false })
-    return () => {
-      container.removeEventListener('wheel', wheel)
-      cancelAnimationFrame(frame)
-    }
-  }, [paneId, enabled, onActivate, point])
+    return () => container.removeEventListener('wheel', wheel)
+  }, [enabled, onActivate, point, scroll])
   const modifiers = (event: React.PointerEvent): ('Alt' | 'Control' | 'Meta' | 'Shift')[] =>
     [
       event.altKey ? 'Alt' : null,
@@ -243,7 +252,7 @@ export function PreviewCanvas({
             const dy = previous.startY - event.clientY
             if (Math.abs(dx) + Math.abs(dy) > 5) {
               previous.moved = true
-              emit({ kind: 'scroll', ...position, deltaX: dx, deltaY: dy })
+              void scroll(position, dx, dy)
               previous.startX = event.clientX
               previous.startY = event.clientY
             }

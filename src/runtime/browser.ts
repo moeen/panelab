@@ -330,6 +330,15 @@ export class BrowserRuntime {
       this.inspection.navigated(entry.config.id)
       this.session.touch(page.context())
       this.update(entry, { url, status: 'loading', error: null })
+      // History API and fragment navigations keep the loaded document and fire no load events.
+      void page
+        .waitForLoadState('domcontentloaded')
+        .then(() => page.title())
+        .then((title) => {
+          if (page === entry.page && !entry.loading && entry.state.status === 'loading')
+            this.update(entry, { title, status: 'ready' })
+        })
+        .catch(() => {})
       this.probeHistory(entry, page)
       const mode = entry.echo.navigationMode()
       if (

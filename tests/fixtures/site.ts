@@ -167,6 +167,13 @@ export async function startSite() {
         .end(
           `<!doctype html><body style="margin:0"><script>setTimeout(() => { document.body.style.background = 'rgb(200, 0, 0)' }, ${delay})</script></body>`,
         )
+    } else if (url.pathname === '/routed') {
+      // A client-side router rewrites the address after load, without loading a new document.
+      response
+        .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+        .end(
+          `<!doctype html><title>Routed</title><script>addEventListener('load', () => setTimeout(() => { document.title = 'Rewritten'; history.replaceState(null, '', '/routed?rewritten') }, 300))</script>`,
+        )
     } else if (url.pathname === '/frame') {
       response
         .writeHead(200, { 'content-type': 'text/html' })

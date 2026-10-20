@@ -22,6 +22,8 @@ export class FrameStream {
   private pending: { sequence: number; resolve: () => void } | null = null
   private timer: ReturnType<typeof setTimeout> | undefined
   private quietUntil = 0
+  // Input keeps a pane live: a sharpen screenshot mid-gesture would stall it and hold its frames.
+  private activeAt = 0
   // The newest screencast frame withheld during a quiet window, and the newest one delivered.
   private held: ScreencastFrame | null = null
   private shown: Buffer | null = null
@@ -37,6 +39,7 @@ export class FrameStream {
   }
   activity(): void {
     this.quietUntil = 0
+    this.activeAt = Date.now()
   }
   release(): void {
     this.pending?.resolve()
@@ -94,16 +97,20 @@ export class FrameStream {
     clearTimeout(this.timer)
     this.timer = setTimeout(async () => {
       if (this.key !== key || this.source().page !== page) return
-      if (this.pending) return this.scheduleSharpen(page, key, sharpenDelayMs)
+      if (this.pending || Date.now() - this.activeAt < sharpenDelayMs)
+        return this.scheduleSharpen(page, key, sharpenDelayMs)
       const sequence = this.sequence
+      const activeAt = this.activeAt
       const viewport = page.viewportSize()
       this.quietUntil = Date.now() + quietMs
       const data = await page
         .screenshot({ type: 'png', caret: 'initial', timeout: 2000 })
         .catch(() => null)
-      // A newer screencast frame means the page moved on; keep the live frame.
+      // A newer screencast frame or input means the page moved on; keep the live frame.
+      if (this.activeAt !== activeAt) return this.settle(page, key)
       if (data && viewport && this.key === key && this.sequence === sequence)
         await this.deliver(page, data, 'image/png', viewport.width, viewport.height)
+      if (this.activeAt !== activeAt) return this.settle(page, key)
       this.quietUntil = Date.now() + quietMs
       this.timer = setTimeout(() => this.settle(page, key), quietMs)
     }, delay)

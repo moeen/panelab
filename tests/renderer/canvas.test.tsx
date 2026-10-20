@@ -293,3 +293,55 @@ test('capture requests never exceed the emulated device pixels', async () => {
     )
   await screen.unmount()
 })
+
+test('wheel deltas accumulate while a scroll is in flight instead of queueing', async () => {
+  const screen = await render(
+    <div style={{ width: 400, height: 200 }}>
+      <PreviewCanvas
+        paneId="wheel"
+        label="Wheel"
+        touch={false}
+        sourceWidth={1600}
+        enabled
+        onActivate={() => {}}
+      />
+    </div>,
+    { wrapper: ReactFlowProvider },
+  )
+  const canvas = screen.getByLabelText('Interactive preview: Wheel. Click to focus website input.')
+  const stage = canvas.element().parentElement
+  if (!stage) throw new Error('Stage missing')
+  stage.style.width = '400px'
+  stage.style.height = '200px'
+  let finish = () => {}
+  bridge.send.mockImplementation(async (command) => {
+    if (command.type === 'input' && command.input.kind === 'scroll')
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+    return true
+  })
+  const scrolls = () =>
+    bridge.send.mock.calls.flatMap(([command]) =>
+      command.type === 'input' && command.input.kind === 'scroll' ? [command.input] : [],
+    )
+  try {
+    for (const deltaY of [10, 20, 30])
+      stage.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY,
+          clientX: 10,
+          clientY: 10,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    expect(scrolls().map((input) => input.deltaY)).toEqual([10])
+    finish()
+    await expect.poll(() => scrolls().map((input) => input.deltaY)).toEqual([10, 50])
+    finish()
+  } finally {
+    bridge.send.mockImplementation(async () => true)
+    await screen.unmount()
+  }
+})

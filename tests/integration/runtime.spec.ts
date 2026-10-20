@@ -498,6 +498,44 @@ test('shows a paint that lands inside the quiet window after a sharpening captur
     .toBeGreaterThan(painted)
 })
 
+test('ongoing input defers the sharpening capture until the pane is idle', async ({
+  runtime,
+  port,
+}) => {
+  test.skip(test.info().project.name.includes('firefox'), 'Firefox never sharpens')
+  await runtime.execute({
+    type: 'visibility',
+    paneId: 'source',
+    visible: true,
+    width: 2560,
+    height: 1600,
+  })
+  await expect.poll(() => port.latest.get('source')?.mime, { timeout: 10_000 }).toBe('image/png')
+  const sharpened = () => port.frames.filter((frame) => frame.mime === 'image/png').length
+  const before = sharpened()
+  for (let step = 0; step < 15; step++) {
+    await runtime.execute({
+      type: 'input',
+      paneId: 'source',
+      input: { kind: 'move', x: 100 + step * 10, y: 100 },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  expect(sharpened()).toBe(before)
+  await expect.poll(() => port.latest.get('source')?.mime, { timeout: 10_000 }).toBe('image/png')
+})
+
+test('a client-side address change after load leaves the preview ready', async ({
+  runtime,
+  site,
+  states,
+}) => {
+  await runtime.execute({ type: 'navigate', url: `${site.url}/routed`, paneIds: ['source'] })
+  await expect.poll(() => states.get('source')?.url).toBe(`${site.url}/routed?rewritten`)
+  await expect.poll(() => states.get('source')?.status).toBe('ready')
+  expect(states.get('source')?.title).toBe('Rewritten')
+})
+
 test('reports history availability and steps only the requested panes', async ({
   runtime,
   workspace,
