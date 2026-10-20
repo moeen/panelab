@@ -180,3 +180,31 @@ test('changing a device cancels an in-flight load instead of waiting for it', as
   expect(await hanging).toMatchObject({ ok: false })
   await expect.poll(() => states.get('source')).toMatchObject({ status: 'ready' })
 })
+
+test('a new address replaces a load still in progress', async ({ runtime, site, states }) => {
+  // The starting page has no #counter, so a click that runs before the new page loads fails.
+  await runtime.execute({ type: 'navigate', paneIds: null, url: `${site.url}/missing` })
+  const hanging = runtime.execute({ type: 'navigate', paneIds: null, url: `${site.url}/hang` })
+  await expect
+    .poll(() => states.get('source'))
+    .toMatchObject({
+      status: 'loading',
+      url: `${site.url}/hang`,
+    })
+  // Queued behind the hanging load, this click must wait for the page that replaces it.
+  const click = runtime.execute({
+    type: 'act',
+    paneIds: ['source'],
+    input: { action: 'click', selector: '#counter' },
+  })
+  const started = Date.now()
+  expect(
+    await runtime.execute({ type: 'navigate', paneIds: null, url: `${site.url}/second` }),
+  ).toEqual({ ok: true })
+  expect(Date.now() - started).toBeLessThan(5_000)
+  expect(await hanging).toEqual({ ok: true })
+  expect((await click).act?.[0]).toMatchObject({ status: 'done' })
+  for (const pane of states.values())
+    expect(pane).toMatchObject({ status: 'ready', url: `${site.url}/second`, error: null })
+  expect(await runtime.execute({ type: 'reload', paneIds: null })).toEqual({ ok: true })
+})

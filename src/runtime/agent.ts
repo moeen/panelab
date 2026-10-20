@@ -1,5 +1,6 @@
 import type { ElementHandle, Frame } from 'playwright'
 import { z } from 'zod'
+import { readStates } from '../shared/agent'
 import {
   boxModelSchema,
   type ElementDetail,
@@ -8,6 +9,7 @@ import {
   keyProperties,
   nodeSummarySchema,
   parseDeclarations,
+  selectorSchema,
   type Target,
   targetSchema,
 } from '../shared/inspection'
@@ -85,6 +87,40 @@ export const pageScanSchema = z.object({
 })
 export type PageScan = z.infer<typeof pageScanSchema>
 
+const readElementSchema = z.object({
+  role: text(40),
+  name: text(200),
+  tag: text(40),
+  state: z.array(z.enum(readStates)).max(readStates.length),
+  value: text(200).nullable(),
+  href: text(2000).nullable(),
+  inViewport: z.boolean(),
+  css: text(2000),
+  selectors: z.array(selectorSchema).max(8),
+})
+export const pageReadSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('missing') }),
+  z.object({ status: z.literal('ambiguous') }),
+  z.object({
+    status: z.literal('read'),
+    title: text(500),
+    url: text(8192),
+    lang: text(35),
+    headings: z
+      .array(z.object({ level: z.number().int().min(1).max(6), text: text(200) }))
+      .max(100),
+    landmarks: z.array(z.object({ role: text(40), name: text(200) })).max(50),
+    text: z.object({
+      content: text(20_000),
+      offset: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    }),
+    elements: z.array(readElementSchema).max(500),
+    elementCount: z.number().int().nonnegative(),
+  }),
+])
+export type PageReadResult = z.infer<typeof pageReadSchema>
+
 const nullSchema = z.null()
 const droppedSchema = z.array(text(300)).max(50)
 const propertiesSchema = z.array(text(100)).max(2000)
@@ -161,6 +197,14 @@ export class PageAgentClient {
   }
   setLiveCss(css: string, enabled: boolean): Promise<string[]> {
     return this.call(droppedSchema, 'setLiveCss', { css, enabled })
+  }
+  read(args: {
+    within: string | null
+    offset: number
+    maxText: number
+    maxElements: number
+  }): Promise<PageReadResult> {
+    return this.call(pageReadSchema, 'read', args)
   }
   scan(): Promise<PageScan> {
     return this.call(pageScanSchema, 'scan', null)

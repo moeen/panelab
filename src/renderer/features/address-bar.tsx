@@ -15,6 +15,8 @@ function traverse(direction: 'back' | 'forward'): void {
 // Shows where the selected pane is; submitting still navigates every pane.
 export function AddressBar({ current, selected }: { current: Workspace; selected: string | null }) {
   const input = useRef<HTMLInputElement>(null)
+  // A click that focuses the field selects the whole address; later clicks place the caret.
+  const selectOnClick = useRef(false)
   // An edited address survives live URL updates until it is submitted or abandoned.
   const [draft, setDraft] = useState<string | null>(null)
   const pane = usePane(selected)
@@ -97,6 +99,15 @@ export function AddressBar({ current, selected }: { current: Workspace; selected
             spellCheck={false}
             value={address}
             onChange={(event) => setDraft(event.target.value)}
+            onPointerDown={(event) => {
+              selectOnClick.current = document.activeElement !== event.currentTarget
+            }}
+            onPointerUp={(event) => {
+              if (!selectOnClick.current) return
+              selectOnClick.current = false
+              if (event.currentTarget.selectionStart === event.currentTarget.selectionEnd)
+                event.currentTarget.select()
+            }}
             onKeyDown={(event) => {
               if (event.key !== 'Escape' || draft === null) return
               event.preventDefault()

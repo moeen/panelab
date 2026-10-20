@@ -11,13 +11,14 @@ import {
   webkit,
 } from 'playwright'
 import { z } from 'zod'
-import type { ActInput, ActReport } from '../shared/agent'
+import type { ActInput, ActReport, PageRead, ReadInput, ReadReport } from '../shared/agent'
 import {
   type AppEvent,
   ackSchema,
   type Engine,
   engineLabels,
   engineUnavailableMessage,
+  isPageUrl,
   normalizeUrl,
   type PaneConfig,
   type PaneState,
@@ -26,6 +27,8 @@ import {
   type RuntimeReply,
   type Workspace,
 } from '../shared/contracts'
+import { acceptLanguage, defaultLanguages, type MediaSettings } from '../shared/emulation'
+import type { Selector } from '../shared/inspection'
 import { pickerMessageSchema } from '../shared/picker'
 import { highlightMessageSchema, PageAgentClient } from './agent'
 import { catalog, recoverDevices, resolveDevice } from './devices'
@@ -66,6 +69,13 @@ type Entry = {
   // The id of the select picker this pane's page has open, if any.
   picker: string | null
   historyProbe: number
+  // Bumped by every navigation; a load whose generation moved on was superseded.
+  navigation: number
+  loading: boolean
+  // The navigation that replaced an in-progress load; queued work waits for it.
+  preempting: Promise<void> | null
+  // Media features the context was created with; later pages need emulateMedia only after a change.
+  contextMedia: string
   disposed: boolean
   profileFingerprint: string
 }
@@ -198,6 +208,10 @@ export class BrowserRuntime {
       intentReplays: new Map(),
       picker: null,
       historyProbe: 0,
+      navigation: 0,
+      loading: false,
+      preempting: null,
+      contextMedia: '',
       disposed: false,
       profileFingerprint: JSON.stringify(this.profiles.get(config.deviceId)),
     }
@@ -208,7 +222,9 @@ export class BrowserRuntime {
   private enqueue<T>(entry: Entry, task: () => Promise<T>): Promise<T> {
     const next = entry.tail
       .catch(() => {})
-      .then(() => {
+      .then(async () => {
+        // Work queued behind a replaced load still waits for the navigation that replaced it.
+        while (entry.preempting) await entry.preempting
         if (entry.disposed) throw new Error(removedMessage)
         return task()
       })
@@ -230,10 +246,15 @@ export class BrowserRuntime {
       const { device, options } = resolveDevice(profile, entry.config.engine, browser.version())
       if (device.synthetic && !entry.config.synthetic)
         throw new Error('Enable synthetic emulation before combining this device and engine.')
+      const languages = this.workspace?.languages ?? defaultLanguages
       const context = await browser.newContext({
         ...options,
+        ...mediaOptions(entry.config.media),
+        locale: languages[0] ?? 'en-US',
+        extraHTTPHeaders: { 'Accept-Language': acceptLanguage(languages) },
         storageState: this.session.seed(entry.config.engine),
       })
+      entry.contextMedia = JSON.stringify(entry.config.media)
       context.setDefaultTimeout(5000)
       context.setDefaultNavigationTimeout(20000)
       entry.context = context
@@ -295,6 +316,9 @@ export class BrowserRuntime {
     this.closePicker(entry)
     entry.pages.push(page)
     entry.page = page
+    // Popups start with the context's media features, which may predate a live change.
+    if (JSON.stringify(entry.config.media) !== entry.contextMedia)
+      void page.emulateMedia(mediaOptions(entry.config.media)).catch(() => {})
     entry.diagnostics.attach(page)
     this.update(entry, { popup: entry.pages.length > 1 })
     page.on('framenavigated', (frame) => {
@@ -313,7 +337,7 @@ export class BrowserRuntime {
         this.workspace.sync.navigation &&
         !entry.config.excluded &&
         mode !== 'ignore' &&
-        /^https?:/.test(url)
+        isPageUrl(url)
       )
         for (const follower of this.followers(entry)) {
           // A replayed activation navigates its follower; the rest follow the URL.
@@ -322,7 +346,7 @@ export class BrowserRuntime {
             .then((matched) => {
               if (matched) return
               follower.echo.automate()
-              return this.enqueue(follower, async () => {
+              return this.preempt(follower, async () => {
                 // A follower that already arrived, by its own replay or redirect, stays put.
                 if (follower.page?.url() === url) return follower.echo.settle()
                 await this.open(follower)
@@ -342,7 +366,8 @@ export class BrowserRuntime {
     })
     page.on('load', () => {
       this.session.touch(page.context())
-      if (page === entry.page) this.update(entry, { status: 'ready' })
+      // A late load from the previous document must not mark a pending navigation ready.
+      if (page === entry.page && !entry.loading) this.update(entry, { status: 'ready' })
     })
     page.on('crash', () =>
       this.update(entry, { status: 'error', error: 'The page crashed. Reload this preview.' }),
@@ -377,7 +402,7 @@ export class BrowserRuntime {
       this.closePicker(entry)
       entry.stream.invalidate()
       entry.page = entry.pages.at(-1) ?? null
-      if (entry.page && /^https?:/.test(entry.page.url())) entry.config.url = entry.page.url()
+      if (entry.page && isPageUrl(entry.page.url())) entry.config.url = entry.page.url()
       this.update(entry, {
         popup: entry.pages.length > 1,
         url: entry.page?.url() ?? entry.config.url,
@@ -491,7 +516,10 @@ export class BrowserRuntime {
     const page = entry.page
     if (!page) throw new Error('Preview is unavailable.')
     if (suppress) entry.echo.automate()
-    this.update(entry, { status: 'loading', error: null })
+    const generation = ++entry.navigation
+    const current = () => generation === entry.navigation
+    entry.loading = true
+    this.update(entry, { url, status: 'loading', error: null })
     try {
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded' })
@@ -509,13 +537,32 @@ export class BrowserRuntime {
           waitUntil: 'domcontentloaded',
         })
       }
-      this.update(entry, { url: page.url(), title: await page.title(), status: 'ready' })
+      const title = await page.title()
+      if (current()) this.update(entry, { url: page.url(), title, status: 'ready' })
     } catch (error) {
+      if (!current()) return
       this.update(entry, { status: 'error', error: friendlyError(error) })
       throw error
     } finally {
+      if (current()) entry.loading = false
       if (suppress) entry.echo.settle()
     }
+  }
+  // A newer address replaces a load still in progress instead of waiting for it to finish or time out.
+  private preempt(entry: Entry, task: () => Promise<void>): Promise<void> {
+    if (!entry.loading || !entry.page || entry.page.isClosed()) return this.enqueue(entry, task)
+    const run = task()
+    const settled: Promise<void> = run
+      .then(
+        () => {},
+        () => {},
+      )
+      .then(() => {
+        if (entry.preempting === settled) entry.preempting = null
+      })
+    entry.preempting = settled
+    entry.tail = Promise.allSettled([entry.tail, settled]).then(() => {})
+    return run
   }
   // The caller chooses which panes move, so traversal never broadcasts to synchronized followers.
   private async traverse(entry: Entry, direction: 'back' | 'forward'): Promise<void> {
@@ -641,13 +688,18 @@ export class BrowserRuntime {
         await this.session.load(command.session)
         if (this.workspace) this.inspection.reset()
       }
+      // Locale is fixed per context, so new website languages recreate every preview.
+      const relocalized =
+        this.workspace?.id === command.workspace.id &&
+        this.workspace.languages.join() !== command.workspace.languages.join()
       this.workspace = command.workspace
       await Promise.all(
         command.workspace.panes.map(async (config) => {
           let entry = this.entries.get(config.id)
           if (
             entry &&
-            (entry.config.deviceId !== config.deviceId ||
+            (relocalized ||
+              entry.config.deviceId !== config.deviceId ||
               entry.config.engine !== config.engine ||
               ((entry.context || entry.opening) && !this.availableEngines.has(config.engine)) ||
               (entry.state.device &&
@@ -656,7 +708,14 @@ export class BrowserRuntime {
             entry = await this.rebuild(entry, config)
           entry ??= this.makeEntry(config)
           const oldUrl = entry.config.url
+          const restyled = JSON.stringify(entry.config.media) !== JSON.stringify(config.media)
           entry.config = { ...config }
+          if (restyled && entry.pages.length) {
+            const pages = [...entry.pages]
+            void this.enqueue(entry, () =>
+              Promise.all(pages.map((page) => page.emulateMedia(mediaOptions(config.media)))),
+            ).catch(() => {})
+          }
           entry.profileFingerprint = JSON.stringify(this.profiles.get(config.deviceId))
           if (!this.availableEngines.has(config.engine)) {
             this.update(entry, {
@@ -737,21 +796,25 @@ export class BrowserRuntime {
         entries = [
           ...new Set([...entries, ...this.followers(this.requireEntry(command.paneIds[0] ?? ''))]),
         ]
-      return this.across(entries, async (entry) => {
-        if (command.type === 'navigate')
-          return this.navigate(entry, normalizeUrl(command.url), true)
-        if (!this.availableEngines.has(entry.config.engine)) return
-        if (entry.page) {
-          entry.echo.automate()
-          this.update(entry, { status: 'loading', error: null })
-          try {
-            await entry.page.reload({ waitUntil: 'domcontentloaded' })
-            this.update(entry, { status: 'ready' })
-          } finally {
-            entry.echo.settle()
-          }
-        } else if (entry.config.url) await this.navigate(entry, entry.config.url, true)
-      })
+      return this.across(
+        entries,
+        async (entry) => {
+          if (command.type === 'navigate')
+            return this.navigate(entry, normalizeUrl(command.url), true)
+          if (!this.availableEngines.has(entry.config.engine)) return
+          if (entry.page) {
+            entry.echo.automate()
+            this.update(entry, { status: 'loading', error: null })
+            try {
+              await entry.page.reload({ waitUntil: 'domcontentloaded' })
+              this.update(entry, { status: 'ready' })
+            } finally {
+              entry.echo.settle()
+            }
+          } else if (entry.config.url) await this.navigate(entry, entry.config.url, true)
+        },
+        command.type === 'navigate',
+      )
     }
     if (command.type === 'inspect.query')
       return {
@@ -773,6 +836,23 @@ export class BrowserRuntime {
         ),
       )
       return { ok: true, act }
+    }
+    if (command.type === 'page.read') {
+      const entries = command.paneIds.map((id) => this.requireEntry(id))
+      const read = await Promise.all(
+        entries.map((entry) =>
+          this.enqueue(entry, () => this.read(entry, command.input)).catch(
+            (error: unknown): ReadReport => ({
+              paneId: entry.config.id,
+              label: '',
+              status: 'unavailable',
+              error: friendlyError(error),
+              page: null,
+            }),
+          ),
+        ),
+      )
+      return { ok: true, read }
     }
     if (isInspectCommand(command)) {
       await this.inspection.execute(command)
@@ -890,6 +970,40 @@ export class BrowserRuntime {
       return { ok: true }
     })
   }
+  // Reading runs after pending navigation on the pane's queue, so it reflects the last action.
+  private async read(entry: Entry, input: ReadInput): Promise<ReadReport> {
+    const page = entry.page
+    const report = (
+      status: ReadReport['status'],
+      error: string | null,
+      result: PageRead | null = null,
+    ): ReadReport => ({ paneId: entry.config.id, label: '', status, error, page: result })
+    if (!page || page.isClosed() || !entry.agentKey)
+      return report('unavailable', 'Open a website in this preview first.')
+    const frame = page.mainFrame()
+    const raw = await new PageAgentClient(frame, entry.agentKey).read({
+      within: input.within ?? null,
+      offset: input.offset ?? 0,
+      maxText: input.maxText ?? 4000,
+      maxElements: input.maxElements ?? 150,
+    })
+    if (raw.status === 'missing') return report('missing', 'No element matches `within` here.')
+    if (raw.status === 'ambiguous')
+      return report('ambiguous', '`within` matches several elements here; make it unique.')
+    const { status: _status, elements, ...rest } = raw
+    const verified = await Promise.all(
+      elements.map(async ({ css, selectors, ...element }) => {
+        const selector = await uniqueSelector(frame, css, selectors)
+        return {
+          ...element,
+          selector,
+          text: selector ? await uniqueText(frame, element.name, selector) : null,
+          missingIn: [],
+        }
+      }),
+    )
+    return report('read', null, { ...rest, elements: verified })
+  }
   // Agent actions name their target explicitly; a missing or ambiguous match is reported, never guessed.
   private async act(entry: Entry, input: ActInput): Promise<ActReport> {
     const page = entry.page
@@ -947,10 +1061,13 @@ export class BrowserRuntime {
   private async across(
     entries: Entry[],
     task: (entry: Entry) => Promise<void>,
+    preempt = false,
   ): Promise<RuntimeReply> {
     for (const entry of entries) entry.stream.activity()
     const results = await Promise.allSettled(
-      entries.map((entry) => this.enqueue(entry, () => task(entry))),
+      entries.map((entry) =>
+        preempt ? this.preempt(entry, () => task(entry)) : this.enqueue(entry, () => task(entry)),
+      ),
     )
     const failed = results.filter((result) => result.status === 'rejected').length
     return failed
@@ -967,12 +1084,79 @@ export class BrowserRuntime {
   }
 }
 
+const matchesOne = (frame: Frame, selector: string) =>
+  frame
+    .locator(selector)
+    .count()
+    .then((count) => count === 1)
+    .catch(() => false)
+// The first CSS selector `act` would resolve to exactly this element; null when none is unique.
+async function uniqueSelector(
+  frame: Frame,
+  css: string,
+  selectors: Selector[],
+): Promise<string | null> {
+  if (css && (await matchesOne(frame, css))) return css
+  for (const { kind, value, tag } of selectors) {
+    const quoted = JSON.stringify(value)
+    const candidate =
+      kind === 'testid'
+        ? `[data-testid=${quoted}]`
+        : kind === 'id'
+          ? `[id=${quoted}]`
+          : kind === 'name'
+            ? `${tag}[name=${quoted}]`
+            : kind === 'label'
+              ? `${tag}[aria-label=${quoted}]`
+              : kind === 'path'
+                ? value
+                : null
+    if (candidate && (await matchesOne(frame, candidate))) return candidate
+  }
+  return null
+}
+// `act --text` matches substrings, so the name is offered only when it reaches this element alone.
+async function uniqueText(frame: Frame, name: string, selector: string): Promise<string | null> {
+  if (!name || name.length > 500) return null
+  const locator = frame.getByText(name)
+  if ((await locator.count().catch(() => 0)) !== 1) return null
+  const target = await frame
+    .locator(selector)
+    .elementHandle()
+    .catch(() => null)
+  if (!target) return null
+  try {
+    return (await locator.evaluate((element, other) => other.contains(element), target))
+      ? name
+      : null
+  } catch {
+    return null
+  } finally {
+    await target.dispose()
+  }
+}
+
+function mediaOptions(media: MediaSettings) {
+  return {
+    colorScheme: media.colorScheme,
+    reducedMotion: media.reducedMotion ? 'reduce' : 'no-preference',
+    contrast: media.contrast ? 'more' : 'no-preference',
+    forcedColors: media.forcedColors ? 'active' : 'none',
+  } as const
+}
+
 export function friendlyError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (/Executable doesn't exist|browserType.launch/.test(message))
     return 'Browser engine unavailable. Open Browser engines settings to download or repair it.'
   if (/ERR_CONNECTION_REFUSED|Could not connect/.test(message))
     return 'Website refused the connection. Start its server or check the URL, then reload.'
+  if (
+    /ERR_FILE_NOT_FOUND|NS_ERROR_FILE_NOT_FOUND|requested URL was not found on this server/i.test(
+      message,
+    )
+  )
+    return 'No file exists at this address. Check the path, then reload.'
   if (/ERR_CERT|certificate/i.test(message))
     return 'HTTPS certificate is not trusted. Trust the development certificate in macOS, then reload.'
   return message.split('\n')[0]?.slice(0, 500) ?? 'Preview failed. Reload to try again.'

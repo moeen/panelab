@@ -1,5 +1,6 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import type { BrowserRuntime } from '../../src/runtime/browser'
 import { catalog } from '../../src/runtime/devices'
 import type { StorageSnapshot } from '../../src/shared/contracts'
@@ -203,6 +204,36 @@ test('shared navigation and reload affect excluded panes with sync disabled', as
   expect(site.requests()).toBeGreaterThanOrEqual(before + 3)
 })
 
+test('opens local files by path and explains a missing one', async ({
+  runtime,
+  directory,
+  states,
+}) => {
+  const path = join(directory, 'local page.html')
+  await writeFile(path, '<title>Local fixture</title><h1>Local</h1>')
+  expect(await runtime.execute({ type: 'navigate', url: path, paneIds: null })).toEqual({
+    ok: true,
+  })
+  for (const pane of states.values())
+    expect(pane).toMatchObject({
+      status: 'ready',
+      title: 'Local fixture',
+      url: pathToFileURL(path).href,
+    })
+  expect(await runtime.execute({ type: 'reload', paneIds: null })).toEqual({ ok: true })
+  expect(
+    await runtime.execute({
+      type: 'navigate',
+      url: join(directory, 'missing.html'),
+      paneIds: ['source'],
+    }),
+  ).toMatchObject({ ok: false })
+  expect(states.get('source')).toMatchObject({
+    status: 'error',
+    error: 'No file exists at this address. Check the path, then reload.',
+  })
+})
+
 test('a website popup opens inside its own preview and closes back to the opener', async ({
   runtime,
   site,
@@ -272,6 +303,80 @@ test('changes emulation without losing supported storage or hidden capture', asy
   })
   expect(reportOf(site, 'source')?.cookie).toContain('session=fixture-secret')
   expect(port.count('source')).toBe(frameCount)
+})
+
+test('preview media features change live, without reloading the website', async ({
+  runtime,
+  workspace,
+  site,
+}) => {
+  await expect.poll(() => reportOf(site, 'source')?.boxes.counter).toBeTruthy()
+  expect(reportOf(site, 'source')?.media).toEqual({
+    dark: false,
+    reducedMotion: false,
+    contrast: false,
+    forcedColors: false,
+  })
+  const counter = reportOf(site, 'source')?.boxes.counter
+  if (!counter) throw new Error('Fixture not ready')
+  await click(runtime, 'source', counter)
+  await expect.poll(() => reportOf(site, 'source')?.clicks).toBe(1)
+  const media = {
+    colorScheme: 'dark',
+    reducedMotion: true,
+    contrast: true,
+    forcedColors: true,
+  } as const
+  await runtime.execute({
+    type: 'reconcile',
+    availableEngines: ['chromium', 'webkit', 'firefox'],
+    workspace: {
+      ...workspace,
+      panes: workspace.panes.map((pane) => (pane.id === 'source' ? { ...pane, media } : pane)),
+    },
+    devices: [],
+    session: null,
+  })
+  await expect.poll(() => reportOf(site, 'source')?.media.dark).toBe(true)
+  expect(reportOf(site, 'source')).toMatchObject({
+    clicks: 1,
+    media: { reducedMotion: true, contrast: true, forcedColors: true },
+  })
+  expect(reportOf(site, 'follower')?.media.dark).toBe(false)
+  const popup = reportOf(site, 'source')?.boxes.popup
+  if (!popup) throw new Error('Fixture not ready')
+  await click(runtime, 'source', popup)
+  await expect
+    .poll(() => [...site.reports.values()].find((item) => item.path === '/popup')?.media.dark)
+    .toBe(true)
+})
+
+test('website languages set navigator.language and Accept-Language, keeping the session', async ({
+  runtime,
+  workspace,
+  site,
+}) => {
+  await expect.poll(() => reportOf(site, 'source')?.boxes.storage).toBeTruthy()
+  expect(reportOf(site, 'source')).toMatchObject({ language: 'en-US', acceptLanguage: 'en-US' })
+  const storage = reportOf(site, 'source')?.boxes.storage
+  if (!storage) throw new Error('Fixture not ready')
+  await click(runtime, 'source', storage)
+  await expect.poll(() => reportOf(site, 'source')?.stored).toBe('fixture-secret')
+  await runtime.execute({
+    type: 'reconcile',
+    availableEngines: ['chromium', 'webkit', 'firefox'],
+    workspace: { ...workspace, languages: ['de-DE', 'fr'] },
+    devices: [],
+    session: null,
+  })
+  for (const pane of ['source', 'follower', 'excluded'])
+    await expect
+      .poll(() => reportOf(site, pane))
+      .toMatchObject({
+        language: 'de-DE',
+        acceptLanguage: 'de-DE,fr;q=0.9',
+        stored: 'fixture-secret',
+      })
 })
 
 test('session reset signs every pane out and removal disposes the pane', async ({

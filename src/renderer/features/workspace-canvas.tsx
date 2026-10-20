@@ -15,7 +15,7 @@ import {
   useStore,
   type Viewport,
 } from '@xyflow/react'
-import { Columns3, LayoutGrid, Minus, Plus, Rows3, Scan } from 'lucide-react'
+import { Columns3, LayoutGrid, Minus, Plus, RotateCw, Rows3, Scan } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -42,6 +42,7 @@ type PaneData = {
 }
 type PaneNode = Node<PaneData, 'pane'>
 type CanvasProps = Omit<PaneData, 'config' | 'device' | 'selected' | 'maximized'> & {
+  onRotateAll: () => void
   panes: PaneConfig[]
   deviceMap: Map<string, DeviceProfile>
   selected: string | null
@@ -210,8 +211,18 @@ function Canvas(props: CanvasProps) {
       else return
       event.preventDefault()
     }
+    const shortcut = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return
+      if (event.detail === 'zoom-in') void flow.zoomIn({ duration: motion() })
+      else if (event.detail === 'zoom-out') void flow.zoomOut({ duration: motion() })
+      else if (event.detail === 'zoom-reset') void flow.zoomTo(1, { duration: motion() })
+    }
     window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
+    window.addEventListener('panelab:shortcut', shortcut)
+    return () => {
+      window.removeEventListener('keydown', key)
+      window.removeEventListener('panelab:shortcut', shortcut)
+    }
   }, [fitAll, flow, selected])
   return (
     <ReactFlow<PaneNode>
@@ -267,7 +278,7 @@ function Canvas(props: CanvasProps) {
           nodeBorderRadius={6}
         />
       ) : null}
-      <Toolbar onFit={fitAll} onArrange={arrangeAll} />
+      <Toolbar onFit={fitAll} onArrange={arrangeAll} onRotateAll={props.onRotateAll} />
     </ReactFlow>
   )
 }
@@ -275,8 +286,10 @@ function Canvas(props: CanvasProps) {
 function Toolbar({
   onFit,
   onArrange,
+  onRotateAll,
 }: {
   onFit: () => void
+  onRotateAll: () => void
   onArrange: (mode: ArrangeMode) => void
 }) {
   const flow = useReactFlow()
@@ -326,6 +339,15 @@ function Toolbar({
         onClick={onFit}
       >
         <Scan />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Rotate phones and tablets"
+        title="Rotate phones and tablets (⌘⌥R)"
+        onClick={onRotateAll}
+      >
+        <RotateCw />
       </Button>
       <Popover open={arrangeOpen} onOpenChange={setArrangeOpen}>
         <PopoverTrigger

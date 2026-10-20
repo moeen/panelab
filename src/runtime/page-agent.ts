@@ -962,6 +962,222 @@ export function installPageAgent(options: PageAgentOptions): void {
     }
   }
 
+  // Page reading for agents: what a person sees and can operate, with act-ready selectors.
+  const clip = (value: string | null | undefined, max: number) =>
+    (value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+  const rendered = (element: Element) => {
+    const style = getComputedStyle(element)
+    const rect = element.getBoundingClientRect()
+    return (
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      (rect.width > 0 || rect.height > 0)
+    )
+  }
+  const operable =
+    'a[href],button,input:not([type="hidden"]),select,textarea,summary,[contenteditable]:not([contenteditable="false"]),[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="switch"],[role="tab"],[role="menuitem"],[role="option"],[role="combobox"],[role="textbox"],[role="searchbox"],[role="slider"]'
+  const inputRoles: Record<string, string> = {
+    button: 'button',
+    submit: 'button',
+    reset: 'button',
+    image: 'button',
+    checkbox: 'checkbox',
+    radio: 'radio',
+    range: 'slider',
+    search: 'searchbox',
+  }
+  const roleOf = (element: Element) => {
+    const explicit = element.getAttribute('role')?.trim().split(/\s+/)[0]
+    if (explicit) return explicit
+    if (element instanceof HTMLAnchorElement) return 'link'
+    if (element instanceof HTMLInputElement) return inputRoles[element.type] ?? 'textbox'
+    if (element instanceof HTMLSelectElement)
+      return element.multiple || element.size > 1 ? 'listbox' : 'combobox'
+    if (
+      element instanceof HTMLTextAreaElement ||
+      (element instanceof HTMLElement && element.isContentEditable)
+    )
+      return 'textbox'
+    return element.tagName === 'SUMMARY' || element.tagName === 'BUTTON' ? 'button' : 'generic'
+  }
+  const nameOf = (element: Element) => {
+    const labelledby = element
+      .getAttribute('aria-labelledby')
+      ?.split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ')
+    const labels =
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLSelectElement ||
+      element instanceof HTMLTextAreaElement
+        ? Array.from(element.labels ?? [], (label) => label.textContent ?? '').join(' ')
+        : ''
+    const buttonValue =
+      element instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(element.type)
+        ? element.value
+        : ''
+    const own =
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLSelectElement ||
+      element instanceof HTMLTextAreaElement
+        ? ''
+        : element instanceof HTMLElement
+          ? element.innerText
+          : element.textContent
+    const image = element.querySelector('img[alt]')?.getAttribute('alt')
+    for (const candidate of [
+      labelledby,
+      element.getAttribute('aria-label'),
+      labels,
+      buttonValue,
+      own,
+      image,
+      element.getAttribute('title'),
+      element.getAttribute('placeholder'),
+    ]) {
+      const name = clip(candidate, 200)
+      if (name) return name
+    }
+    return ''
+  }
+  const secret = (element: Element) =>
+    element instanceof HTMLInputElement &&
+    (element.type === 'password' ||
+      /cc-|one-time-code|current-password|new-password/.test(
+        element.getAttribute('autocomplete') ?? '',
+      ))
+  const currentValue = (element: Element) => {
+    if (element instanceof HTMLSelectElement)
+      return clip(Array.from(element.selectedOptions, (option) => option.text).join(', '), 200)
+    if (element instanceof HTMLTextAreaElement) return element.value.slice(0, 200)
+    if (
+      element instanceof HTMLInputElement &&
+      !['button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file'].includes(element.type)
+    )
+      return element.value.slice(0, 200)
+    return null
+  }
+  const stateOf = (element: Element) => {
+    const aria = (name: string) => element.getAttribute(`aria-${name}`)
+    const states: string[] = []
+    // :disabled also covers controls inside a disabled fieldset.
+    if (element.matches(':disabled') || aria('disabled') === 'true') states.push('disabled')
+    if (element instanceof HTMLInputElement && element.indeterminate) states.push('mixed')
+    else if ((element instanceof HTMLInputElement && element.checked) || aria('checked') === 'true')
+      states.push('checked')
+    else if (aria('checked') === 'mixed') states.push('mixed')
+    if (
+      aria('expanded') === 'true' ||
+      (element.tagName === 'SUMMARY' &&
+        element.parentElement instanceof HTMLDetailsElement &&
+        element.parentElement.open)
+    )
+      states.push('expanded')
+    if (aria('selected') === 'true') states.push('selected')
+    if (aria('pressed') === 'true') states.push('pressed')
+    if (element.matches(':required') || aria('required') === 'true') states.push('required')
+    if (
+      ((element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) &&
+        element.readOnly) ||
+      aria('readonly') === 'true'
+    )
+      states.push('readonly')
+    if (document.activeElement === element) states.push('focused')
+    if (secret(element)) states.push('redacted')
+    return states
+  }
+  const landmarkRoles: Record<string, string> = {
+    HEADER: 'banner',
+    NAV: 'navigation',
+    MAIN: 'main',
+    ASIDE: 'complementary',
+    FOOTER: 'contentinfo',
+    SEARCH: 'search',
+  }
+  const read = (args: {
+    within: string | null
+    offset: number
+    maxText: number
+    maxElements: number
+  }) => {
+    let root: Element = document.body ?? document.documentElement
+    if (args.within) {
+      const matches = document.querySelectorAll(args.within)
+      if (matches.length !== 1) return { status: matches.length ? 'ambiguous' : 'missing' }
+      root = matches[0] ?? root
+    }
+    const all = (selector: string) => [
+      ...(root.matches(selector) ? [root] : []),
+      ...Array.from(root.querySelectorAll(selector)),
+    ]
+    const full = (root instanceof HTMLElement ? root.innerText : (root.textContent ?? ''))
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+    const headings = all('h1,h2,h3,h4,h5,h6,[role="heading"]')
+      .filter(rendered)
+      .slice(0, 100)
+      .map((element) => ({
+        level: Math.min(
+          6,
+          Math.max(
+            1,
+            Number(element.getAttribute('aria-level')) || Number(element.tagName[1]) || 2,
+          ),
+        ),
+        text: clip(element.textContent, 200),
+      }))
+    const landmarks = all(
+      'header,nav,main,aside,footer,search,form[aria-label],form[aria-labelledby],section[aria-label],section[aria-labelledby],[role="banner"],[role="navigation"],[role="main"],[role="complementary"],[role="contentinfo"],[role="search"],[role="region"],[role="form"]',
+    )
+      .filter(rendered)
+      .slice(0, 50)
+      .map((element) => ({
+        role: (
+          element.getAttribute('role') ??
+          landmarkRoles[element.tagName] ??
+          (element.tagName === 'FORM' ? 'form' : 'region')
+        ).slice(0, 40),
+        name: clip(
+          element.getAttribute('aria-label') ??
+            (element.getAttribute('aria-labelledby') ? nameOf(element) : ''),
+          200,
+        ),
+      }))
+    const candidates = all(operable).filter(rendered)
+    const width = innerWidth
+    const height = innerHeight
+    const elements = candidates.slice(0, args.maxElements).map((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        role: roleOf(element).slice(0, 40),
+        name: nameOf(element),
+        tag: element.tagName.toLowerCase().slice(0, 40),
+        state: stateOf(element),
+        value: secret(element) ? null : currentValue(element),
+        href: element instanceof HTMLAnchorElement ? element.href.slice(0, 2000) : null,
+        inViewport: rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width,
+        css: cssSelectorOf(element).slice(0, 2000),
+        selectors: identify(element, false),
+      }
+    })
+    return {
+      status: 'read',
+      title: clip(document.title, 500),
+      url: location.href.slice(0, 8192),
+      lang: clip(document.documentElement.lang, 35),
+      headings,
+      landmarks,
+      text: {
+        content: full.slice(args.offset, args.offset + args.maxText),
+        offset: Math.min(args.offset, full.length),
+        total: full.length,
+      },
+      elements,
+      elementCount: candidates.length,
+    }
+  }
+
   const api = {
     hover: (args: { at: Parameters<typeof elementAt>[0] | null }) => {
       track('hover', args.at ? elementAt(args.at) : null)
@@ -988,6 +1204,7 @@ export function installPageAgent(options: PageAgentOptions): void {
     setInline,
     setLiveCss,
     scan,
+    read,
     supports: (args: { properties: string[] }) =>
       args.properties.filter((property) => !CSS.supports(property, 'initial')),
     // Applies a choice from PaneLab's picker; a stale picker or a removed select changes nothing.

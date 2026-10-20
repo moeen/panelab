@@ -1,6 +1,8 @@
-import { watch as watchFiles } from 'node:fs'
+import { statSync, watch as watchFiles } from 'node:fs'
 import { mkdtemp, readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { clientPath, clientSnippet, installClaudeCode, installClient } from '../core/clients'
 import { type ConnectMode, connectLab } from '../core/connect'
@@ -19,6 +21,7 @@ import {
   UnavailableError,
 } from '../shared/agent'
 import { type RequestType, requestTypes } from '../shared/diagnostics'
+import { parseLanguages } from '../shared/emulation'
 import { type Engine, engines } from '../shared/engines'
 import * as format from './format'
 
@@ -35,6 +38,21 @@ export type Io = {
   connect?: typeof connectLab
 }
 
+// The app may run from another directory, so local paths become absolute file URLs here.
+export function pageAddress(input: string, cwd = process.cwd(), home = homedir()): string {
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(input) || input.startsWith('/')) return input
+  if (input.startsWith('~/')) return pathToFileURL(join(home, input.slice(2))).href
+  const path = resolve(cwd, input)
+  return /^\.\.?\//.test(input) || isFile(path) ? pathToFileURL(path).href : input
+}
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
+}
+
 export const defaultDevices = ['iphone-16', 'pixel-7', 'ipad-air-11-m3', 'macbook-air-13']
 
 const usage = `PaneLab: real Chromium, WebKit, and Firefox previews for responsive work.
@@ -48,6 +66,7 @@ Previews
   shot <url>                     Save PNG screenshots              [--full-page] [--out dir]
   scan <url>                     Rank overflow, engine and mobile issues   [--limit n]
   inspect <url> <selector>       Compare one element across previews       [--props a,b]
+  read <url>                     Text, headings and act-ready elements  [--within sel] [--offset n] [--limit n]
   act <url> <action> [target] [value]
                                  ${actActions.join('|')}; target is a CSS selector, or --text
   diff <url>                     Cross-engine diff, or --baseline dir [--update] [--threshold n]
@@ -65,6 +84,8 @@ Options
                                  (default ${defaultDevices.join(', ')})
   -e, --engine <list>            chromium,webkit,firefox (default: each device's engine)
       --synthetic                Allow emulated pairs such as iPhone in Chromium
+      --dark | --reduced-motion  Emulate a dark color scheme or reduced motion in new previews
+      --lang <list>              Website languages, preferred first (default en-US)
       --headless | --attach      Force a mode; default attaches to the open app if agent access is on
       --storage-state <file>     Playwright storage state for signed-in headless runs
       --timeout <ms>             Load and action timeout
@@ -76,6 +97,9 @@ const options = {
   device: { type: 'string', short: 'd', multiple: true },
   engine: { type: 'string', short: 'e', multiple: true },
   synthetic: { type: 'boolean' },
+  dark: { type: 'boolean' },
+  'reduced-motion': { type: 'boolean' },
+  lang: { type: 'string' },
   headless: { type: 'boolean' },
   attach: { type: 'boolean' },
   'storage-state': { type: 'string' },
@@ -86,6 +110,8 @@ const options = {
   out: { type: 'string' },
   limit: { type: 'string' },
   props: { type: 'string' },
+  within: { type: 'string' },
+  offset: { type: 'string' },
   text: { type: 'string' },
   baseline: { type: 'string' },
   update: { type: 'boolean' },
@@ -198,20 +224,29 @@ async function previews(
   io: Io,
   print: Print,
 ): Promise<number> {
+  const languages = values.lang === undefined ? undefined : parseLanguages(values.lang)
+  if (languages && !languages.success)
+    throw new UsageError(languages.error.issues[0]?.message ?? 'Invalid --lang value.')
   const timeoutMs = number(values.timeout, 'timeout')
   const timeout = timeoutMs === undefined ? {} : { timeoutMs }
   // Opens the URL on the requested devices, or reuses the app's previews when none are given.
   const prepare = async (url: string | undefined) => {
     if (!url) throw new UsageError(`${command} needs a URL.`)
+    const address = pageAddress(url)
     if (!values.device?.length && lab.mode === 'app' && (await lab.call({ op: 'panes' })).length)
-      return lab.call({ op: 'navigate', url, ...timeout })
+      return lab.call({ op: 'navigate', url: address, ...timeout })
     return lab.call({
       op: 'open',
-      url,
+      url: address,
       devices: values.device?.length ? values.device : defaultDevices,
       engines: engineList(values),
       synthetic: values.synthetic,
       keep: values.keep,
+      media: {
+        ...(values.dark ? { colorScheme: 'dark' as const } : {}),
+        ...(values['reduced-motion'] ? { reducedMotion: true } : {}),
+      },
+      ...(languages ? { languages: languages.data } : {}),
       ...timeout,
     })
   }
@@ -267,6 +302,19 @@ async function previews(
       })
       print(value, format.inspect(value))
       return exitCodes.ok
+    }
+    case 'read': {
+      await prepare(rest[0])
+      const offset = number(values.offset, 'offset')
+      const limit = number(values.limit, 'limit')
+      const value = await lab.call({
+        op: 'read',
+        ...(values.within ? { within: values.within } : {}),
+        ...(offset === undefined ? {} : { offset }),
+        ...(limit === undefined ? {} : { maxElements: limit }),
+      })
+      print(value, format.read(value))
+      return value.every((report) => report.status === 'read') ? exitCodes.ok : exitCodes.failed
     }
     case 'act': {
       const action = actActions.find((item) => item === rest[1])

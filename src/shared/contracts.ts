@@ -1,6 +1,14 @@
 import type { BrowserContext } from 'playwright'
 import { z } from 'zod'
-import { type ActReport, type AgentStatus, actSchema, agentClients } from './agent'
+import {
+  type ActReport,
+  type AgentStatus,
+  actSchema,
+  agentClients,
+  type ReadReport,
+  readSchema,
+} from './agent'
+import { defaultLanguages, defaultMedia, languagesSchema, mediaSchema } from './emulation'
 import { type Engine, engines } from './engines'
 import {
   type FindingsReport,
@@ -90,6 +98,7 @@ export const paneSchema = z.object({
   excluded: z.boolean(),
   synthetic: z.boolean(),
   layout: layoutSchema,
+  media: mediaSchema.default(() => ({ ...defaultMedia })),
 })
 export type PaneConfig = z.infer<typeof paneSchema>
 export const syncSchema = z.object({
@@ -112,6 +121,7 @@ export const workspaceSchema = z.object({
       'Pane IDs must be unique',
     ),
   sync: syncSchema,
+  languages: languagesSchema.default(() => [...defaultLanguages]),
   // Agents connected through the app socket work only in workspaces they own.
   agent: z.boolean().default(false),
 })
@@ -135,6 +145,8 @@ export const settingsSchema = z.object({
   presets: z.array(presetSchema),
   styleEdits: z.enum(styleEditModes).default('inline'),
   agentAccess: z.boolean().default(false),
+  // Chosen through a native dialog in main; captures save here without asking.
+  screenshotFolder: z.string().max(4096).nullable().default(null),
 })
 export const legacySettingsSchema = settingsSchema
   .omit({ enabledEngines: true, engineSetupComplete: true })
@@ -224,6 +236,8 @@ export const commandSchema = z.discriminatedUnion('type', [
     index: pickerIndexSchema.nullable(),
   }),
   z.object({ type: z.literal('style-edits.set'), mode: z.enum(styleEditModes) }),
+  z.object({ type: z.literal('screenshots.folder'), action: z.enum(['choose', 'clear']) }),
+  z.object({ type: z.literal('screenshots.reveal'), id: z.uuid() }),
   z.object({ type: z.literal('agent.access.set'), enabled: z.boolean() }),
   z.object({ type: z.literal('agent.cli.install') }),
   z.object({ type: z.literal('agent.client.install'), client: z.enum(agentClients) }),
@@ -302,7 +316,8 @@ export type AppEvent =
   | { type: 'dialog'; dialog: PageDialog | null; paneId: string; dialogId?: string }
   // Null closes the pane's picker.
   | { type: 'picker'; paneId: string; picker: PagePicker | null }
-  | { type: 'notice'; message: string; error: boolean }
+  // `reveal` names saved screenshots that `screenshots.reveal` can show in Finder.
+  | { type: 'notice'; message: string; error: boolean; reveal?: string }
   | { type: 'agent'; status: AgentStatus }
   | {
       type: 'shortcut'
@@ -313,8 +328,12 @@ export type AppEvent =
         | 'forward'
         | 'inspect'
         | 'reload'
+        | 'rotate-all'
         | 'select-next'
         | 'settings'
+        | 'zoom-in'
+        | 'zoom-out'
+        | 'zoom-reset'
     }
   | InspectEvent
 
@@ -404,6 +423,7 @@ export const runtimeCommandSchema = z.discriminatedUnion('type', [
     quality: z.number().int().min(1).max(100).optional(),
   }),
   z.object({ type: z.literal('act'), paneIds: z.array(id), input: actSchema }),
+  z.object({ type: z.literal('page.read'), paneIds: z.array(id).min(1), input: readSchema }),
   z.object({
     type: z.literal('inspect.query'),
     paneId: id.nullable(),
@@ -424,6 +444,7 @@ export type RuntimeReply = ActionResult & {
   text?: string
   devices?: DeviceProfile[]
   act?: ActReport[]
+  read?: ReadReport[]
   inspection?: InspectionState
   findings?: FindingsReport
   overrides?: OverrideState
@@ -449,16 +470,32 @@ export const defaultSync: SyncSettings = {
   typing: true,
   scroll: true,
 }
+const pageProtocols = ['http:', 'https:', 'file:']
+export const isPageUrl = (url: string) => {
+  try {
+    return pageProtocols.includes(new URL(url).protocol)
+  } catch {
+    return false
+  }
+}
 export function normalizeUrl(value: string): string {
   const input = value.trim()
   if (!input) throw new Error('Enter a website URL first.')
+  if (input.startsWith('/') || /^file:/i.test(input)) {
+    const url = new URL(input.startsWith('/') ? `file://${input}` : input)
+    if (url.hostname && url.hostname !== 'localhost')
+      throw new Error(
+        'Open a local file with an absolute path, such as file:///Users/me/site.html.',
+      )
+    return new URL(url.pathname + url.search + url.hash, 'file://').href
+  }
   if (
     /^[a-z][a-z\d+.-]*:/i.test(input) &&
     !/^https?:/i.test(input) &&
     // `host:port` looks like a scheme but is a bare address.
     !/^[^/:]+:\d+([/?#]|$)/.test(input)
   )
-    throw new Error('Only HTTP and HTTPS websites are supported.')
+    throw new Error('Only HTTP, HTTPS and local file addresses are supported.')
   const candidate = /^https?:\/\//i.test(input)
     ? input
     : /^(([\w-]+\.)*localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(input)
@@ -477,6 +514,7 @@ export function makeWorkspace(name: string, preset?: DevicePreset): Workspace {
     name,
     url: '',
     sync: { ...defaultSync },
+    languages: [...defaultLanguages],
     agent: false,
     panes: profiles.map((pane) => ({ ...pane, id: crypto.randomUUID(), url: '', excluded: false })),
   }

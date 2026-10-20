@@ -234,6 +234,44 @@ test('types characters from non-US layouts as text and keeps shortcuts on physic
   await screen.unmount()
 })
 
+test('app zoom and rotate shortcuts reach the menu instead of the website', async () => {
+  const screen = await render(
+    <PreviewCanvas
+      paneId="menu"
+      label="Menu"
+      touch={false}
+      sourceWidth={1600}
+      enabled
+      onActivate={() => {}}
+    />,
+    { wrapper: ReactFlowProvider },
+  )
+  const input = screen.getByLabelText('Website keyboard input: Menu').element()
+  for (const [key, code, altKey] of [
+    ['=', 'Equal', false],
+    ['-', 'Minus', false],
+    ['0', 'Digit0', false],
+    ['®', 'KeyR', true],
+  ] as const) {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      code,
+      metaKey: true,
+      altKey,
+      bubbles: true,
+      cancelable: true,
+    })
+    input.dispatchEvent(event)
+    expect(event.defaultPrevented, code).toBe(false)
+  }
+  expect(
+    bridge.send.mock.calls.some(
+      ([command]) => command.type === 'input' && command.paneId === 'menu',
+    ),
+  ).toBe(false)
+  await screen.unmount()
+})
+
 test('capture requests never exceed the emulated device pixels', async () => {
   const screen = await render(
     <div style={{ position: 'relative', width: 400, height: 200 }}>

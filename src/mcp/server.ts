@@ -7,12 +7,14 @@ import {
 import { z } from 'zod'
 import { actActions, type LabApi } from '../shared/agent'
 import { requestTypes } from '../shared/diagnostics'
+import { mediaSchema } from '../shared/emulation'
 import { engines } from '../shared/engines'
 
 export const serverVersion = '0.1.1'
 
 const instructions = `PaneLab renders one website in real Chromium, WebKit, and Firefox previews with device emulation.
 Workflow: open_preview (url + devices + engines) → screenshot or scan_findings → inspect_element on a reported selector → edit the code → reload → screenshot/visual_diff to verify.
+read_preview returns each preview's title, headings, visible text, and operable elements with selectors verified to be unique, ready for act.
 Use visual_diff with a baseline directory before and after a change to prove what moved.
 Devices are matched by id, name, or alias (list_devices). iOS devices default to WebKit, Android and desktops to Chromium; other pairs need synthetic: true and are emulations.
 Actions target elements by CSS selector or visible text in every preview at once and report missing or ambiguous matches instead of guessing. No arbitrary JavaScript runs.
@@ -115,7 +117,9 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
       description:
         'Open a URL on devices × engines, replacing current previews unless keep is true. Waits for load.',
       inputSchema: z.object({
-        url: z.string().describe('http(s) URL; localhost:3000 works.'),
+        url: z
+          .string()
+          .describe('http(s) or file URL; localhost:3000 and absolute file paths work.'),
         devices: z
           .array(z.string())
           .min(1)
@@ -129,6 +133,16 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
           .optional()
           .describe('Allow emulated pairs such as iPhone in Chromium.'),
         keep: z.boolean().optional().describe('Keep existing previews.'),
+        media: mediaSchema
+          .partial()
+          .optional()
+          .describe('Media features for the new previews, e.g. { colorScheme: "dark" }.'),
+        languages: z
+          .array(z.string())
+          .min(1)
+          .max(10)
+          .optional()
+          .describe('Website languages, preferred first, e.g. ["de-DE", "en"]. Reloads previews.'),
       }),
       outputSchema: previews,
       annotations: acts,
@@ -296,6 +310,53 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
       annotations: { ...readOnly, openWorldHint: true },
     },
     async ({ limit }, lab) => lab.call({ op: 'scan', ...(limit ? { limit } : {}) }),
+  )
+  tool(
+    'read_preview',
+    {
+      title: 'Read preview',
+      description:
+        'Read what each preview shows: title, headings, landmarks, visible text (paged by offset), and operable elements with role, accessible name, state, and a selector verified unique for act. Elements absent from other previews list them in missingIn. Password and payment values are never returned.',
+      inputSchema: z.object({
+        paneIds,
+        within: z
+          .string()
+          .optional()
+          .describe('CSS selector of one element to read instead of the page.'),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Text offset for the next page of text.'),
+        maxText: z
+          .number()
+          .int()
+          .min(0)
+          .max(20_000)
+          .optional()
+          .describe('Text characters (default 4000).'),
+        maxElements: z
+          .number()
+          .int()
+          .min(0)
+          .max(500)
+          .optional()
+          .describe('Elements per preview (default 150).'),
+      }),
+      outputSchema: z.object({
+        previews: z.array(
+          z.looseObject({
+            paneId: z.string(),
+            label: z.string(),
+            status: z.string(),
+            error: z.string().nullable(),
+          }),
+        ),
+      }),
+      annotations: { ...readOnly, openWorldHint: true },
+    },
+    async (input, lab) => ({ previews: await lab.call({ op: 'read', ...input }) }),
   )
   tool(
     'inspect_element',
@@ -466,7 +527,7 @@ export function createServer(lab: () => Promise<LabApi>): McpServer {
             type: 'text' as const,
             text: `Audit ${url} for responsive and cross-engine problems with PaneLab.
 1. open_preview on ${devices ?? 'iphone-16, pixel-9, ipad-air-11-m3, macbook-air-13'} (add engines webkit and chromium for the laptop).
-2. screenshot and scan_findings. For each error or warning, inspect_element its selector.
+2. screenshot and scan_findings. For each error or warning, inspect_element its selector. To reach menus or forms, read_preview for act-ready selectors, act, then scan again.
 3. Find the responsible source code, propose the smallest fix, and try it with set_live_css first.
 4. After editing code, reload and visual_diff against a baseline captured before the change.
 Report findings with device, engine, selector, cause, and the fix.`,

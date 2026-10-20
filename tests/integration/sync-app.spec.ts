@@ -1,6 +1,7 @@
 import type { BrowserRuntime } from '../../src/runtime/browser'
 import type { Engine } from '../../src/shared/contracts'
 import { defaultSync } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 import { click, expect, test } from '../fixtures/runtime'
 
 // A framework-style page without ids; the follower renders a compact layout that hides the nav link.
@@ -12,12 +13,14 @@ test.use({
       name: 'Sync app',
       url: `${site.url}/app`,
       sync: { ...defaultSync, enabled: true },
+      languages: ['en-US'],
       agent: false,
       panes: ['source', 'follower'].map((id, index) => ({
         id,
         engine,
         deviceId: 'mac-laptop',
         synthetic: false,
+        media: { ...defaultMedia },
         excluded: false,
         url: `${site.url}/app?pane=${id}${id === 'follower' ? '&compact' : ''}`,
         layout: { x: index * 768, y: 0, w: 720 },

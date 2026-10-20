@@ -25,13 +25,15 @@ WebKit is the engine behind Safari, not the Safari app itself.
 
 ## Opening a site
 
-Type `localhost:3000` or any HTTP or HTTPS address into the shared address bar. `localhost` and `*.localhost` default to HTTP, and other bare hosts default to HTTPS. Navigation and reload from the address bar reach every pane, including panes excluded from synchronization.
+Type `localhost:3000`, any HTTP or HTTPS address, or a local file (`file:///Users/you/site/index.html` or just `/Users/you/site/index.html`) into the shared address bar. `localhost` and `*.localhost` default to HTTP, and other bare hosts default to HTTPS. Navigation and reload from the address bar reach every pane, including panes excluded from synchronization. Opening a new address while a page is still loading replaces that load right away.
 
-The address bar shows the selected pane's location. An address you are editing stays put until you open it or press Escape. Back and forward move the selected pane through its own history, or every participating pane while navigation is synchronized. They're disabled when the engine reports no history in that direction, and stay enabled when the engine can't tell (no Navigation API, or cross-origin entries it can't see).
+The address bar shows the selected pane's location; clicking into it selects the whole address. An address you are editing stays put until you open it or press Escape. Back and forward move the selected pane through its own history, or every participating pane while navigation is synchronized. They're disabled when the engine reports no history in that direction, and stay enabled when the engine can't tell (no Navigation API, or cross-origin entries it can't see).
 
 ## Devices
 
-Pick devices in the sidebar to add previews. The library has 34 curated device and screen-size families from [`device-catalog.json`](../src/shared/device-catalog.json), including five MacBook sizes and seven iPads. Search also matches equivalent models listed as aliases. Rotate a phone or tablet to get its landscape variant.
+Pick devices in the sidebar to add previews. The library has 34 curated device and screen-size families from [`device-catalog.json`](../src/shared/device-catalog.json), including five MacBook sizes and seven iPads. Search also matches equivalent models listed as aliases. Rotate a phone or tablet to get its landscape variant, or rotate every phone and tablet at once with **Rotate phones and tablets** in the canvas toolbar (`⌘⌥R`). Desktops rotate only from their own preview settings, which creates a custom portrait profile.
+
+**Preview settings → Media features** emulates a dark color scheme, reduced motion, more contrast, and forced colors for one preview. Changes apply live without reloading, and the preview footer names what's active. **Workspace options → Website languages** sets the languages every preview sends in `Accept-Language` and reports as `navigator.language`, preferred first (for example `de-DE, en`). Changing languages reloads every preview and keeps the signed-in session.
 
 Each pane gets its own browser context with the device's viewport, screen size, pixel ratio, mobile and touch settings, user agent, and platform. iOS devices default to WebKit and Android devices to Chromium. Desktop profiles work in all three engines.
 
@@ -47,7 +49,7 @@ Custom devices let you set viewport and screen size, pixel ratio, orientation, t
 
 Previews sit on a free canvas. Drag a preview by its header to move it; other previews stay where they are, and positions snap to an 8px grid. Drag the lower-right corner to resize. Height follows the site's aspect ratio and the emulated viewport doesn't change.
 
-Scroll over empty canvas, or hold Space and drag, to pan. Pinch or ⌘-scroll to zoom. Scrolling over a preview scrolls the website.
+Scroll over empty canvas, or hold Space and drag, to pan. Pinch, ⌘-scroll, or `⌘=` / `⌘−` to zoom, and `⌘0` for 100%. Scrolling over a preview scrolls the website.
 
 The toolbar in the lower right has zoom controls, **Fit all previews**, and **Arrange previews**: one row, a grid, or one row per engine. Arranging also gives every preview the selected preview's scale so sizes compare honestly. **Zoom to preview** (header button, double-click the header, or Preview settings) fits one preview to the window without moving anything, and Escape returns to the previous view.
 
@@ -100,6 +102,10 @@ All previews in a workspace share one website session across engines. Sign in on
 
 Sessions are saved every 30 seconds, on workspace switches, and on quit. **Workspace options → Reset website sessions…** signs every preview out and clears the saved session.
 
+## Screenshots
+
+**Capture all previews** in the toolbar and `⌘⇧S` (selected preview) ask where to save. Choose a folder under **Workspace options → Screenshots** to save there directly; files are named by device, engine, and time. The saved notice has **Show in Finder**. If the folder is missing or read-only, PaneLab says so and asks again.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |
@@ -112,6 +118,8 @@ Sessions are saved every 30 seconds, on workspace switches, and on quit. **Works
 | `⌘[` / `⌘]` | Back / forward |
 | `⌘⇧]` | Select the next preview |
 | `⌘1`–`⌘9` | Select a preview by position |
+| `⌘=` / `⌘−` / `⌘0` | Zoom the canvas in / out / to 100% |
+| `⌘⌥R` | Rotate phones and tablets |
 | `Escape` | Cancel element picking, leave website input, or exit Zoom to preview |
 | `Space` + drag | Pan the canvas |
 | `⇧1` | Fit all previews |
@@ -149,7 +157,9 @@ PANELAB_DATA_DIR=/tmp/panelab-dev pnpm dev
 
 **Engine unavailable.** Open **Browser engines**, enable the engine, and select **Download** or **Retry download**. Paused previews resume when it's ready.
 
-**Connection refused.** Start your dev server and check the host and port. PaneLab only opens HTTP and HTTPS.
+**Connection refused.** Start your dev server and check the host and port. PaneLab opens HTTP, HTTPS, and local files.
+
+**No file exists at this address.** Check the absolute path of the local file, then reload.
 
 **HTTPS certificate error.** Trust your development certificate in macOS and reload. PaneLab doesn't bypass certificate checks.
 

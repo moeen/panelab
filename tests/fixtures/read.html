@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Read fixture</title>
+  </head>
+  <body>
+    <header>
+      <nav aria-label="Primary">
+        <a href="/read">Home</a>
+        <a id="docs" href="/read#docs">Docs</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Checkout</h1>
+      <p>Review your order before paying.</p>
+      <form aria-label="Sign in" id="account" onsubmit="event.preventDefault()">
+        <h2>Account</h2>
+        <label for="email">Email</label>
+        <input id="email" type="email" value="me@example.com" required />
+        <label>Password <input type="password" value="hunter2" /></label>
+        <input aria-label="Card number" autocomplete="cc-number" value="4111111111111111" />
+        <label><input type="checkbox" checked /> Remember me</label>
+        <button type="submit">Sign in</button>
+      </form>
+      <ul>
+        <li><span>Tea</span> <button type="button" onclick="this.textContent = 'Added'">Add</button></li>
+        <li><span>Cake</span> <button type="button" onclick="this.textContent = 'Added'">Add</button></li>
+      </ul>
+      <span id="volume-label">Volume</span>
+      <input type="range" aria-labelledby="volume-label" value="30" />
+      <details open><summary>More</summary><p>Details text</p></details>
+      <button type="button" disabled>Pay</button>
+      <button type="button" style="display: none">Hidden</button>
+      <a href="/read#footer" style="display: block; margin-top: 3000px">Footer link</a>
+    </main>
+    <script>
+      if (location.search.includes('compact')) document.getElementById('docs').remove()
+    </script>
+  </body>
+</html>

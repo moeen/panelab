@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { historyTargets } from '../../src/renderer/lib/navigation'
 import { defaultSync, type PaneConfig, type Workspace } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 
 function pane(id: string, excluded = false): PaneConfig {
   return {
@@ -10,6 +11,7 @@ function pane(id: string, excluded = false): PaneConfig {
     url: '',
     excluded,
     synthetic: false,
+    media: { ...defaultMedia },
     layout: { x: 0, y: 0, w: 300 },
   }
 }
@@ -19,6 +21,7 @@ function workspace(sync: Partial<Workspace['sync']>): Workspace {
     name: 'Workspace',
     url: '',
     sync: { ...defaultSync, ...sync },
+    languages: ['en-US'],
     agent: false,
     panes: [pane('a'), pane('b'), pane('c', true)],
   }

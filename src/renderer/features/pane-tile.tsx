@@ -36,6 +36,12 @@ import type { DeviceProfile, PaneConfig } from '../../shared/contracts'
 import { type Engine, engineLabels, engines, requiresSynthetic } from '../../shared/engines'
 import { PreviewCanvas } from './preview-canvas'
 
+const mediaToggles = [
+  { key: 'reducedMotion', label: 'Reduced motion' },
+  { key: 'contrast', label: 'More contrast' },
+  { key: 'forcedColors', label: 'Forced colors' },
+] as const
+
 export const PaneTile = memo(function PaneTile({
   config,
   device,
@@ -66,6 +72,10 @@ export const PaneTile = memo(function PaneTile({
   const activate = useCallback(() => selectPane(config.id), [config.id])
   const active = pane?.status === 'ready' || pane?.status === 'loading'
   const EngineIcon = { chromium: Aperture, webkit: Compass, firefox: Flame }[config.engine]
+  const emulated = [
+    config.media.colorScheme === 'dark' ? 'Dark' : null,
+    ...mediaToggles.filter(({ key }) => config.media[key]).map(({ label }) => label),
+  ].filter((label) => label !== null)
   const update = (patch: Partial<PaneConfig>) =>
     void saveWorkspace((workspace) => ({
       ...workspace,
@@ -197,6 +207,40 @@ export const PaneTile = memo(function PaneTile({
               />
               Exclude from synchronization
             </label>
+            <fieldset className="mt-4">
+              <legend className="field-label">Media features</legend>
+              <NativeSelect
+                aria-label="Color scheme"
+                value={config.media.colorScheme}
+                onChange={(event) =>
+                  update({
+                    media: {
+                      ...config.media,
+                      colorScheme: event.target.value === 'dark' ? 'dark' : 'light',
+                    },
+                  })
+                }
+              >
+                <option value="light">Light color scheme</option>
+                <option value="dark">Dark color scheme</option>
+              </NativeSelect>
+              {mediaToggles.map(({ key, label }) => (
+                <label
+                  key={key}
+                  htmlFor={`${key}-${config.id}`}
+                  className="mt-2 flex items-center gap-2 text-xs"
+                >
+                  <Checkbox
+                    id={`${key}-${config.id}`}
+                    checked={config.media[key]}
+                    onCheckedChange={(value) =>
+                      update({ media: { ...config.media, [key]: value } })
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
             {device ? (
               <details className="mt-4 text-xs">
                 <summary className="cursor-pointer font-medium">Display dimensions</summary>
@@ -334,6 +378,14 @@ export const PaneTile = memo(function PaneTile({
                   ? 'Sync excluded'
                   : pane?.title || (pane?.status === 'ready' ? 'Ready' : 'Waiting for URL')}
         </span>
+        {emulated.length ? (
+          <span
+            className="min-w-0 shrink truncate text-[10px] text-muted-foreground"
+            title={`Emulating ${emulated.join(', ').toLowerCase()}`}
+          >
+            {emulated.join(' · ')}
+          </span>
+        ) : null}
         {overridden ? (
           <button
             type="button"

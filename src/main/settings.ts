@@ -77,6 +77,10 @@ export class SettingsService {
       }
     })
   }
+  // Main picks the folder with a native dialog; renderer commands never carry a path.
+  setScreenshotFolder(path: string | null): Promise<void> {
+    return this.serialize(() => this.commitField('screenshotFolder', path))
+  }
   private async commit(): Promise<ActionResult> {
     await this.persist()
     this.host.changed(this.settings)

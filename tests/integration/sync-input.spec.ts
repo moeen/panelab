@@ -1,6 +1,7 @@
 import type { BrowserRuntime } from '../../src/runtime/browser'
 import type { Engine, RuntimeMessage } from '../../src/shared/contracts'
 import { defaultSync } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 import type { PagePicker } from '../../src/shared/picker'
 import { click, expect, test } from '../fixtures/runtime'
 import type { SyncReport } from '../fixtures/site'
@@ -14,12 +15,14 @@ test.use({
       name: 'Sync input',
       url: `${site.url}/sync`,
       sync: { ...defaultSync, enabled: true },
+      languages: ['en-US'],
       agent: false,
       panes: ['source', 'follower'].map((id, index) => ({
         id,
         engine,
         deviceId: 'mac-laptop',
         synthetic: false,
+        media: { ...defaultMedia },
         excluded: false,
         url: `${site.url}/sync?pane=${id}${id === 'follower' ? '&compact' : ''}`,
         layout: { x: index * 768, y: 0, w: 720 },

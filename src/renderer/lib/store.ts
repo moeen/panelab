@@ -22,7 +22,7 @@ type RootState = {
   selected: string | null
   maximized: string | null
   inspector: InspectorTab | null
-  notice: { message: string; error: boolean } | null
+  notice: { message: string; error: boolean; reveal?: string } | null
   dialog: PageDialog | null
   engineSettingsOpen: boolean
   agentSettingsOpen: boolean
@@ -85,10 +85,16 @@ export function setEngineSettings(open: boolean): void {
 export function setAgentSettings(open: boolean): void {
   update({ agentSettingsOpen: open })
 }
-export function showNotice(message: string, error = true): void {
+export function showNotice(message: string, error = true, reveal?: string): void {
   clearTimeout(noticeTimer)
-  update({ notice: { message, error } })
-  noticeTimer = setTimeout(() => update({ notice: null }), error ? 8000 : 3500)
+  update({ notice: reveal ? { message, error, reveal } : { message, error } })
+  // Notices with an action stay long enough to reach the button.
+  noticeTimer = setTimeout(() => update({ notice: null }), error || reveal ? 8000 : 3500)
+}
+// A notice stays while the pointer or keyboard focus is on it, so its action stays reachable.
+export function holdNotice(held: boolean): void {
+  clearTimeout(noticeTimer)
+  if (!held && state.notice) noticeTimer = setTimeout(() => update({ notice: null }), 3500)
 }
 function diagnostics(id: string): DiagnosticState {
   return diagnosticStates.get(id) ?? emptyDiagnostics
@@ -132,7 +138,7 @@ function receive(event: AppEvent): void {
   } else if (event.type === 'pane') {
     paneStates.set(event.pane.id, event.pane)
     for (const listener of paneSubscribers.get(event.pane.id) ?? []) listener()
-  } else if (event.type === 'notice') showNotice(event.message, event.error)
+  } else if (event.type === 'notice') showNotice(event.message, event.error, event.reveal)
   else if (event.type === 'agent')
     update({ snapshot: state.snapshot ? { ...state.snapshot, agent: event.status } : null })
   else if (

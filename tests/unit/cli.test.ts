@@ -1,7 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
-import { defaultDevices, exitCodes, type Io, run } from '../../src/cli/main'
+import { read } from '../../src/cli/format'
+import { defaultDevices, exitCodes, type Io, pageAddress, run } from '../../src/cli/main'
 import { AppUnavailableError } from '../../src/core/connect'
 import { Lab } from '../../src/core/lab'
 import { type LabApi, UnavailableError } from '../../src/shared/agent'
@@ -84,6 +85,53 @@ describe('commands', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
+  test('opens dark, reduced-motion previews in the requested languages', async () => {
+    const { fake, connect } = lab()
+    const args = ['open', 'localhost:5173', '-d', 'pixel-7', '--dark', '--reduced-motion']
+    expect(await run([...args, '--lang', 'de-de, en'], io(connect).io)).toBe(exitCodes.ok)
+    expect(fake.workspace().languages).toEqual(['de-DE', 'en'])
+    expect(fake.workspace().panes[0]?.media).toEqual({
+      colorScheme: 'dark',
+      reducedMotion: true,
+      contrast: false,
+      forcedColors: false,
+    })
+    const invalid = io(lab().connect)
+    expect(await run(['open', 'localhost:5173', '--lang', 'not a tag!'], invalid.io)).toBe(
+      exitCodes.usage,
+    )
+    expect(invalid.err.join('')).toContain('language tags')
+  })
+
+  test('read passes paging options and fails when a preview cannot be read', async () => {
+    const { fake, connect } = lab((command) =>
+      command.type === 'page.read'
+        ? {
+            ok: true,
+            read: command.paneIds.map((paneId, index) => ({
+              paneId,
+              label: '',
+              status: index ? 'missing' : 'read',
+              error: index ? 'No element matches `within` here.' : null,
+              page: null,
+            })),
+          }
+        : undefined,
+    )
+    const result = io(connect)
+    const args = ['read', 'example.com', '-d', 'pixel-7', '-d', 'macbook-air-13']
+    expect(
+      await run([...args, '--within', 'main', '--offset', '40', '--limit', '5'], result.io),
+    ).toBe(exitCodes.failed)
+    expect(fake.commands.at(-1)).toMatchObject({
+      type: 'page.read',
+      input: { within: 'main', offset: 40, maxElements: 5 },
+    })
+    expect(
+      JSON.parse(result.out[0] ?? '[]').map((item: { status: string }) => item.status),
+    ).toEqual(['read', 'missing'])
+  })
+
   test('act fails the process when any preview did not complete', async () => {
     const { connect } = lab((command) =>
       command.type === 'act' && command.input.action === 'click'
@@ -119,6 +167,67 @@ describe('commands', () => {
 })
 
 // The CLI and MCP server run in plain Node; only the app's main process may load Electron.
+test('local paths become absolute file addresses; websites pass through', () => {
+  const cwd = resolve('tests/fixtures')
+  expect(pageAddress('./site.html', cwd)).toBe(`file://${cwd}/site.html`)
+  expect(pageAddress('site.html', cwd)).toBe(`file://${cwd}/site.html`)
+  expect(pageAddress('../My Page.html', cwd)).toBe(`file://${resolve('tests')}/My%20Page.html`)
+  expect(pageAddress('~/page.html', cwd, '/Users/me')).toBe('file:///Users/me/page.html')
+  for (const address of ['localhost:3000', 'example.com', 'https://example.com/a', '/tmp/a.html'])
+    expect(pageAddress(address, cwd)).toBe(address)
+})
+
+test('read output outlines headings, lists act targets, and points to the next text page', () => {
+  const text = read([
+    {
+      paneId: 'p',
+      label: 'Pixel 7 · Chromium',
+      status: 'read',
+      error: null,
+      page: {
+        title: 'Shop',
+        url: 'https://example.test/',
+        lang: 'en',
+        headings: [
+          { level: 1, text: 'Shop' },
+          { level: 2, text: 'Cart' },
+        ],
+        landmarks: [],
+        text: { content: 'Welcome', offset: 0, total: 20 },
+        elements: [
+          {
+            role: 'textbox',
+            name: 'Password',
+            tag: 'input',
+            state: ['redacted'],
+            value: null,
+            href: null,
+            inViewport: true,
+            selector: '#password',
+            text: null,
+            missingIn: ['iPhone 16 · WebKit'],
+          },
+        ],
+        elementCount: 3,
+      },
+    },
+    { paneId: 'q', label: 'iPad · WebKit', status: 'missing', error: 'Not here.', page: null },
+  ])
+  expect(text).toBe(
+    [
+      'Pixel 7 · Chromium  Shop  https://example.test/',
+      'h1 Shop',
+      '  h2 Cart',
+      'elements 1 of 3',
+      '  textbox "Password" [redacted]  #password  (missing in iPhone 16 · WebKit)',
+      'text 0–7 of 20; --offset 7 for more',
+      'Welcome',
+      '',
+      'iPad · WebKit: missing  Not here.',
+    ].join('\n'),
+  )
+})
+
 test('agent-facing modules never import Electron', async () => {
   for (const folder of ['src/cli', 'src/core', 'src/mcp']) {
     for (const name of await readdir(folder)) {

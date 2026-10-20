@@ -250,6 +250,9 @@
   .toast {
     @apply fixed bottom-10 left-1/2 z-50 flex max-w-[min(600px,90vw)] -translate-x-1/2 items-center gap-3 rounded-lg bg-foreground px-4 py-3 text-xs text-background shadow-[0_6px_24px_rgb(0_0_0/0.2)];
   }
+  .toast-action {
+    @apply -my-1 shrink-0 rounded-md px-2 py-1 font-semibold underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-background/60;
+  }
 }
 /* Inspection: website overlays use DevTools box-model tints so the regions read as conventions, not chrome. */
 :root {

@@ -5,6 +5,7 @@ declare global {
     clipboard: string
     openPaths: string[]
     savePath: string | null
+    revealed: string[]
     errors: string[]
     worker: UtilityProcess | null
     installs: string[]

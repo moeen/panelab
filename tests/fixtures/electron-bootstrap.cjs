@@ -1,7 +1,7 @@
 const { mkdirSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
-const { app, clipboard, dialog, safeStorage, utilityProcess } = require('electron')
+const { app, clipboard, dialog, safeStorage, shell, utilityProcess } = require('electron')
 const { encryption } = require('./encryption.cjs')
 const childProcess = require('node:child_process')
 const { syncBuiltinESMExports } = require('node:module')
@@ -18,6 +18,7 @@ globalThis.panelabTest = {
   clipboard: '',
   openPaths: [],
   savePath: null,
+  revealed: [],
   errors: [],
   worker: null,
   installs: [],
@@ -36,6 +37,9 @@ dialog.showSaveDialog = async () => ({
   canceled: !globalThis.panelabTest.savePath,
   filePath: globalThis.panelabTest.savePath ?? '',
 })
+shell.showItemInFolder = (path) => {
+  globalThis.panelabTest.revealed.push(path)
+}
 dialog.showErrorBox = (title, message) => {
   globalThis.panelabTest.errors.push(`${title}: ${message}`)
   process.stderr.write(`${title}: ${message}\n`)

@@ -7,6 +7,7 @@ import {
   type SavedSettings,
   type StorageSnapshot,
 } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 import type { ElementDetail, Target } from '../../src/shared/inspection'
 
 export const fixturePreset: DevicePreset = {
@@ -17,18 +18,21 @@ export const fixturePreset: DevicePreset = {
       deviceId: 'mac-laptop',
       engine: 'chromium',
       synthetic: false,
+      media: { ...defaultMedia },
       layout: { x: 0, y: 0, w: 720 },
     },
     {
       deviceId: 'iPhone 13',
       engine: 'webkit',
       synthetic: false,
+      media: { ...defaultMedia },
       layout: { x: 768, y: 0, w: 300 },
     },
     {
       deviceId: 'Pixel 7',
       engine: 'chromium',
       synthetic: false,
+      media: { ...defaultMedia },
       layout: { x: 1116, y: 0, w: 300 },
     },
   ],
@@ -65,6 +69,7 @@ export function settings(): SavedSettings {
     presets: [],
     styleEdits: 'inline',
     agentAccess: false,
+    screenshotFolder: null,
   }
 }
 

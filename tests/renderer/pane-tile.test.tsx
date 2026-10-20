@@ -64,6 +64,9 @@ beforeEach(async () => {
   // Loaded after the module reset so it shares the tile's React copy.
   ReactFlowProvider = (await import('@xyflow/react')).ReactFlowProvider
   await store.initialize()
+  // Browser-mode modules survive between tests, so the tile uses a pane of the live store.
+  const live = store.workspace()?.panes[0]
+  if (live) config = { ...live, deviceId: device.id, engine: 'chromium' }
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -138,3 +141,34 @@ test('the preview menu reloads this preview and returns from a website popup', a
   await screen.getByRole('button', { name: 'Return to original page' }).click()
   expect(bridge.send).toHaveBeenLastCalledWith({ type: 'popup.close', paneId: config.id })
 })
+
+test('media features change from preview settings and are summarized in the footer', async () => {
+  const screen = await tile()
+  pane({ status: 'ready', url: 'https://example.test/' })
+  await screen.getByRole('button', { name: 'Preview settings' }).click()
+  await screen.getByRole('combobox', { name: 'Color scheme' }).selectOptions('dark')
+  await expect
+    .poll(() => saved()?.media)
+    .toEqual({ colorScheme: 'dark', reducedMotion: false, contrast: false, forcedColors: false })
+  await screen.getByRole('checkbox', { name: 'Reduced motion' }).click()
+  await expect.poll(() => saved()?.media.reducedMotion).toBe(true)
+})
+
+test('the footer names emulated media features', async () => {
+  config = {
+    ...config,
+    media: { colorScheme: 'dark', reducedMotion: false, contrast: true, forcedColors: false },
+  }
+  const screen = await tile()
+  await expect.element(screen.getByText('Dark · More contrast')).toBeVisible()
+})
+
+function saved(): PaneConfig | undefined {
+  const call = vi
+    .mocked(bridge.send)
+    .mock.calls.map(([command]) => command)
+    .findLast((command) => command.type === 'workspace.save')
+  return call?.type === 'workspace.save'
+    ? call.workspace.panes.find((item) => item.id === config.id)
+    : undefined
+}

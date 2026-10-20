@@ -14,6 +14,9 @@ import {
   type LabResults,
   labRequestSchema,
   type PaneSummary,
+  type ReadElement,
+  type ReadInput,
+  type ReadReport,
   type Shot,
   slug,
   UnavailableError,
@@ -37,6 +40,7 @@ import {
   type Workspace,
 } from '../shared/contracts'
 import { filterNetwork, queryMatcher } from '../shared/diagnostics'
+import { defaultMedia, mediaSchema } from '../shared/emulation'
 import { keyProperties } from '../shared/inspection'
 import { diffShots, pngFileSize } from './diff'
 
@@ -167,6 +171,7 @@ export class Lab implements LabApi {
       const ids = await this.paneIds(input.paneIds)
       return this.act({ type: 'act', paneIds: ids, input })
     },
+    read: async ({ op: _op, paneIds, ...input }) => this.read(await this.paneIds(paneIds), input),
     screenshot: async ({ paneIds, fullPage, directory, preview }) =>
       this.screenshot(await this.paneIds(paneIds), fullPage ?? false, directory, preview ?? false),
     scan: async ({ limit }) => {
@@ -357,6 +362,7 @@ export class Lab implements LabApi {
           url: '',
           excluded: false,
           synthetic,
+          media: mediaSchema.parse({ ...defaultMedia, ...request.media }),
           layout: {
             ...nextPosition([...kept, ...added]),
             w: widthAt(profile.viewport.width, defaultScale),
@@ -364,7 +370,12 @@ export class Lab implements LabApi {
         })
       }
     }
-    await this.backend.commit({ ...workspace, url, panes: [...kept, ...added] })
+    await this.backend.commit({
+      ...workspace,
+      url,
+      panes: [...kept, ...added],
+      languages: request.languages ?? workspace.languages,
+    })
     const ids = added.map((pane) => pane.id)
     await this.navigate(url, ids, request.timeoutMs)
     return this.summaries(ids)
@@ -385,6 +396,36 @@ export class Lab implements LabApi {
   }
   private async act(command: Extract<RuntimeCommand, { type: 'act' }>): Promise<ActReport[]> {
     return this.expect(await this.backend.request(command)).act ?? []
+  }
+
+  private async read(paneIds: string[], input: Omit<ReadInput, 'paneIds'>): Promise<ReadReport[]> {
+    const reply = this.expect(
+      await this.backend.request({ type: 'page.read', paneIds, input: { ...input, paneIds } }),
+    )
+    const panes = new Map((await this.backend.workspace()).panes.map((pane) => [pane.id, pane]))
+    const reports = (reply.read ?? []).map((report) => {
+      const pane = panes.get(report.paneId)
+      return { ...report, label: pane ? this.label(pane) : report.paneId }
+    })
+    // Only complete element lists can prove an element is absent from another preview.
+    const key = (element: ReadElement) => `${element.role}\u0000${element.name}`
+    const complete = reports.flatMap((report) =>
+      report.page && report.page.elements.length === report.page.elementCount
+        ? [
+            {
+              paneId: report.paneId,
+              label: report.label,
+              keys: new Set(report.page.elements.map(key)),
+            },
+          ]
+        : [],
+    )
+    for (const report of reports)
+      for (const element of report.page?.elements ?? [])
+        element.missingIn = complete
+          .filter((other) => other.paneId !== report.paneId && !other.keys.has(key(element)))
+          .map((other) => other.label)
+    return reports
   }
 
   private directory(): Promise<string> {

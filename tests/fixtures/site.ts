@@ -27,6 +27,15 @@ export const reportSchema = z.object({
   scroll: z.number(),
   containerScroll: z.number(),
   boxes: z.record(z.string(), boxSchema),
+  language: z.string(),
+  media: z.object({
+    dark: z.boolean(),
+    reducedMotion: z.boolean(),
+    contrast: z.boolean(),
+    forcedColors: z.boolean(),
+  }),
+  // Added by the server from the report request.
+  acceptLanguage: z.string().default(''),
 })
 export type Report = z.infer<typeof reportSchema>
 export const appReportSchema = z.object({
@@ -59,6 +68,7 @@ export async function startSite() {
   let requests = 0
   const html = await readFile(new URL('./site.html', import.meta.url), 'utf8')
   const inspect = await readFile(new URL('./inspect.html', import.meta.url), 'utf8')
+  const read = await readFile(new URL('./read.html', import.meta.url), 'utf8')
   const app = await readFile(new URL('./app.html', import.meta.url), 'utf8')
   const appReports = new Map<string, AppReport>()
   const sync = await readFile(new URL('./sync.html', import.meta.url), 'utf8')
@@ -84,7 +94,10 @@ export async function startSite() {
           return
         }
         // Panes share cookies, so the pane name identifies a preview; popups fall back to the token.
-        reports.set(parsed.data.pane || parsed.data.token, parsed.data)
+        reports.set(parsed.data.pane || parsed.data.token, {
+          ...parsed.data,
+          acceptLanguage: request.headers['accept-language'] ?? '',
+        })
         response.writeHead(204).end()
       })().catch(() => {
         if (!response.headersSent) response.writeHead(400).end()
@@ -126,6 +139,10 @@ export async function startSite() {
           'content-disposition': 'attachment; filename="fixture.txt"',
         })
         .end('fixture-download')
+    } else if (url.pathname === '/read') {
+      response
+        .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+        .end(read)
     } else if (url.pathname === '/inspect') {
       response
         .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })

@@ -32,9 +32,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { AddressBar } from '@/features/address-bar'
 import { ConfirmDialog } from '@/features/confirm-dialog'
 import { EngineSettings } from '@/features/engine-settings'
+import { ScreenshotFolder } from '@/features/screenshot-folder'
 import { WorkspaceCanvas } from '@/features/workspace-canvas'
+import { WorkspaceLanguages } from '@/features/workspace-languages'
 import { inspection, startPicking, stopPicking, useInspection } from '@/lib/inspection'
+import { rotatedPane, rotatesWithAll, rotation } from '@/lib/rotate'
 import {
+  holdNotice,
   initialize,
   maximizePane,
   paneUrl,
@@ -51,6 +55,7 @@ import {
 } from '@/lib/store'
 import { canvasScale, nextPosition, widthAt } from '../shared/arrange'
 import type { DeviceProfile, PaneConfig, Workspace } from '../shared/contracts'
+import { defaultMedia } from '../shared/emulation'
 import { type Engine, engineLabels, engines, requiresSynthetic } from '../shared/engines'
 
 const Inspector = lazy(() => import('./features/inspector'))
@@ -208,6 +213,7 @@ function WorkspaceApp({
           synthetic,
           excluded: false,
           url: value.url,
+          media: { ...defaultMedia },
           layout: {
             ...nextPosition(value.panes),
             w: widthAt(
@@ -266,65 +272,55 @@ function WorkspaceApp({
       }
     })
   }, [])
-  const rotatePane = useCallback(
-    async (id: string) => {
-      const config = workspace()?.panes.find((pane) => pane.id === id)
-      const profile = config ? deviceMap.get(config.deviceId) : null
-      if (!config || !profile) return
-      const builtin = profile.descriptor
-        ? deviceMap.get(
-            profile.id.endsWith(' landscape')
-              ? profile.id.replace(/ landscape$/, '')
-              : `${profile.id} landscape`,
-          )
-        : null
-      let rotated = builtin
-      if (!rotated) {
-        const orientation = profile.orientation === 'portrait' ? 'landscape' : 'portrait'
-        const name = `${profile.name.replace(/ \((portrait|landscape)\)$/, '')} (${orientation})`
-        rotated = devices.find(
-          (device) =>
-            device.name === name &&
-            device.viewport.width === profile.viewport.height &&
-            device.viewport.height === profile.viewport.width,
-        )
-        if (!rotated) {
-          rotated = {
-            ...profile,
-            id: crypto.randomUUID(),
-            name,
-            custom: true,
-            orientation,
-            viewport: { width: profile.viewport.height, height: profile.viewport.width },
-            screen: { width: profile.screen.height, height: profile.screen.width },
-            nativeResolution: profile.nativeResolution
-              ? { width: profile.nativeResolution.height, height: profile.nativeResolution.width }
-              : null,
-            listed: true,
-          }
-          if (!(await send({ type: 'device.save', device: rotated }))) return
+  const rotatePanes = useCallback(
+    async (ids: string[]) => {
+      const customs = [...devices]
+      const changes = new Map<string, { from: DeviceProfile; to: DeviceProfile }>()
+      for (const id of ids) {
+        const config = workspace()?.panes.find((pane) => pane.id === id)
+        const profile = config ? deviceMap.get(config.deviceId) : undefined
+        if (!profile) continue
+        const { target, created } = rotation(profile, deviceMap, customs)
+        if (created) {
+          if (!(await send({ type: 'device.save', device: target }))) return
+          customs.push(target)
         }
+        changes.set(id, { from: profile, to: target })
       }
-      const deviceId = rotated.id
+      if (!changes.size) return
+      // One save, so the runtime reconciles every rotated preview together.
       await saveWorkspace((value) => ({
         ...value,
-        panes: value.panes.map((pane) =>
-          pane.id === id
-            ? {
-                ...pane,
-                deviceId,
-                url: paneUrl(id),
-                layout: {
-                  ...pane.layout,
-                  w: widthAt(rotated.viewport.width, pane.layout.w / profile.viewport.width),
-                },
-              }
-            : pane,
-        ),
+        panes: value.panes.map((pane) => {
+          const change = changes.get(pane.id)
+          return change ? rotatedPane(pane, change.from, change.to, paneUrl(pane.id)) : pane
+        }),
       }))
     },
     [deviceMap, devices],
   )
+  const rotatePane = useCallback((id: string) => rotatePanes([id]), [rotatePanes])
+  const rotateAll = useCallback(() => {
+    const ids = (workspace()?.panes ?? [])
+      .filter((pane) => {
+        const profile = deviceMap.get(pane.deviceId)
+        return profile ? rotatesWithAll(profile) : false
+      })
+      .map((pane) => pane.id)
+    if (ids.length) void rotatePanes(ids)
+    else
+      showNotice(
+        'Rotate all turns phones and tablets. Rotate a desktop from its preview settings.',
+        false,
+      )
+  }, [deviceMap, rotatePanes])
+  useEffect(() => {
+    const shortcut = (event: Event) => {
+      if (event instanceof CustomEvent && event.detail === 'rotate-all') rotateAll()
+    }
+    window.addEventListener('panelab:shortcut', shortcut)
+    return () => window.removeEventListener('panelab:shortcut', shortcut)
+  }, [rotateAll])
   const applyPreset = (id: string) => {
     const preset = state.snapshot?.settings.presets.find((item) => item.id === id)
     if (!preset) return
@@ -473,6 +469,7 @@ function WorkspaceApp({
               <Trash2 />
               Delete workspace…
             </Button>
+            <WorkspaceLanguages key={current.id} languages={current.languages} />
             <label className="field-label mt-4" htmlFor="appearance">
               Appearance
             </label>
@@ -514,6 +511,7 @@ function WorkspaceApp({
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
               How Elements applies a changed value in every preview.
             </p>
+            <ScreenshotFolder folder={state.snapshot.settings.screenshotFolder} />
           </PopoverContent>
         </Popover>
       </header>
@@ -824,6 +822,7 @@ function WorkspaceApp({
                 onRemove={removePane}
                 onDuplicate={duplicatePane}
                 onRotate={rotatePane}
+                onRotateAll={rotateAll}
               />
             ) : (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">
@@ -885,13 +884,33 @@ function WorkspaceApp({
         </span>
       </footer>
       {state.notice ? (
-        <div className="toast" role={state.notice.error ? 'alert' : 'status'}>
+        // biome-ignore lint/a11y/noStaticElementInteractions: Hover and focus only pause the dismissal timer of this status region.
+        <div
+          className="toast"
+          role={state.notice.error ? 'alert' : 'status'}
+          onPointerEnter={() => holdNotice(true)}
+          onPointerLeave={() => holdNotice(false)}
+          onFocus={() => holdNotice(true)}
+          onBlur={() => holdNotice(false)}
+        >
           {state.notice.error ? (
             <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
           ) : (
             <Check className="size-4 shrink-0" aria-hidden="true" />
           )}
           <span>{state.notice.message}</span>
+          {state.notice.reveal ? (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => {
+                const id = state.notice?.reveal
+                if (id) void send({ type: 'screenshots.reveal', id })
+              }}
+            >
+              Show in Finder
+            </button>
+          ) : null}
         </div>
       ) : null}
       {editor ? (
@@ -1032,12 +1051,15 @@ function NamingDialog({
                       preset: {
                         id: crypto.randomUUID(),
                         name,
-                        panes: current.panes.map(({ deviceId, engine, synthetic, layout }) => ({
-                          deviceId,
-                          engine,
-                          synthetic,
-                          layout,
-                        })),
+                        panes: current.panes.map(
+                          ({ deviceId, engine, synthetic, layout, media }) => ({
+                            deviceId,
+                            engine,
+                            synthetic,
+                            layout,
+                            media,
+                          }),
+                        ),
                       },
                     }
             void send(command).then((ok) => {

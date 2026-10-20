@@ -1,3 +1,5 @@
+import { constants } from 'node:fs'
+import { access, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
@@ -11,6 +13,7 @@ import {
   nativeTheme,
   net,
   protocol,
+  shell,
   type UtilityProcess,
   utilityProcess,
 } from 'electron'
@@ -23,6 +26,7 @@ import {
   type AppSnapshot,
   commandSchema,
   type DeviceProfile,
+  isPageUrl,
   normalizeUrl,
   type PaneState,
   type RuntimeCommand,
@@ -67,7 +71,11 @@ const pending = new Map<
 
 function emit(event: AppEvent): void {
   agent?.receive(event)
-  if (window && !window.isDestroyed()) window.webContents.send('panelab:event', event)
+  if (quitting || !window || window.isDestroyed() || window.webContents.isDestroyed()) return
+  // A reloading or crashed renderer has no frame; events resume after the next bootstrap.
+  try {
+    window.webContents.send('panelab:event', event)
+  } catch {}
 }
 function notice(message: string, error = true): void {
   emit({ type: 'notice', message, error })
@@ -127,7 +135,7 @@ async function startWorker(): Promise<void> {
           const pane = message.event.pane
           panes.set(pane.id, pane)
           const saved = config.active().panes.find((item) => item.id === pane.id)
-          if (saved && /^https?:/.test(pane.url) && saved.url !== pane.url) {
+          if (saved && isPageUrl(pane.url) && saved.url !== pane.url) {
             saved.url = pane.url
             schedulePersist()
           }
@@ -224,6 +232,13 @@ async function execute(command: AppCommand): Promise<ActionResult> {
     return config.configure(command)
   if (!worker) await reconcile()
   if (command.type === 'capture') return capture(command.paneIds, command.fullPage)
+  if (command.type === 'screenshots.folder') return screenshotFolder(command.action)
+  if (command.type === 'screenshots.reveal') {
+    const path = revealable.get(command.id)
+    if (!path) throw new Error('These screenshots are no longer available. Capture them again.')
+    shell.showItemInFolder(path)
+    return { ok: true }
+  }
   if (command.type === 'clipboard') {
     const result = await request({
       type: 'clipboard.text',
@@ -253,43 +268,86 @@ async function execute(command: AppCommand): Promise<ActionResult> {
   }
   return request(command)
 }
+// Recent captures that the notice can reveal in Finder, by an opaque id.
+const revealable = new Map<string, string>()
+async function writableFolder(path: string | null): Promise<string | null> {
+  if (!path) return null
+  try {
+    if (!(await stat(path)).isDirectory()) return null
+    await access(path, constants.W_OK)
+    return path
+  } catch {
+    return null
+  }
+}
+async function screenshotFolder(action: 'choose' | 'clear'): Promise<ActionResult> {
+  if (action === 'clear') {
+    await config.setScreenshotFolder(null)
+    publish()
+    return { ok: true }
+  }
+  if (!window) throw new Error('Application window is unavailable.')
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Choose a screenshot folder',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  const path = result.filePaths[0]
+  if (result.canceled || !path) return { ok: true }
+  if (!(await writableFolder(path))) throw new Error('PaneLab cannot write to that folder.')
+  await config.setScreenshotFolder(path)
+  publish()
+  return { ok: true }
+}
 async function capture(ids: string[], fullPage: boolean): Promise<ActionResult> {
   if (!window) throw new Error('Application window is unavailable.')
   const selected = ids.map((id) => config.active().panes.find((pane) => pane.id === id))
   if (selected.some((pane) => !pane)) throw new Error('Preview no longer exists.')
-  const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19)
+  const stamp = new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 23)
   const single = selected.length === 1
-  const result = single
-    ? await dialog.showSaveDialog(window, {
-        title: 'Save screenshot',
-        defaultPath: `PaneLab-${stamp}.png`,
-        filters: [{ name: 'PNG image', extensions: ['png'] }],
-      })
-    : await dialog.showOpenDialog(window, {
-        title: 'Save all preview screenshots',
-        properties: ['openDirectory', 'createDirectory'],
-      })
-  if (result.canceled) return { ok: true }
-  const path = 'filePath' in result ? result.filePath : result.filePaths[0]
+  const chosen = config.settings.screenshotFolder
+  const folder = await writableFolder(chosen)
+  if (chosen && !folder)
+    notice('The screenshot folder is missing or read-only. Choose where to save these screenshots.')
+  let path = folder
+  if (!folder) {
+    const result = single
+      ? await dialog.showSaveDialog(window, {
+          title: 'Save screenshot',
+          defaultPath: `PaneLab-${stamp}.png`,
+          filters: [{ name: 'PNG image', extensions: ['png'] }],
+        })
+      : await dialog.showOpenDialog(window, {
+          title: 'Save all preview screenshots',
+          properties: ['openDirectory', 'createDirectory'],
+        })
+    if (result.canceled) return { ok: true }
+    path = ('filePath' in result ? result.filePath : result.filePaths[0]) || null
+  }
   if (!path) return { ok: true }
+  const files: string[] = []
   let failures = 0
   for (const pane of selected)
     if (pane) {
       const filename = `${pane.deviceId.replace(/[^a-zA-Z\d_-]/g, '-')}-${pane.engine}-${pane.id.slice(0, 8)}-${stamp}.png`
-      const reply = await request({
-        type: 'capture.file',
-        paneId: pane.id,
-        fullPage,
-        path: single ? path : join(path, filename),
-      })
-      if (!reply.ok) failures++
+      const file = single && !folder ? path : join(path, filename)
+      const reply = await request({ type: 'capture.file', paneId: pane.id, fullPage, path: file })
+      if (reply.ok) files.push(file)
+      else failures++
     }
   if (failures)
     return {
       ok: false,
       error: `${failures} screenshot${failures === 1 ? '' : 's'} failed. Open the affected previews and retry.`,
     }
-  notice(single ? 'Screenshot saved.' : `${selected.length} screenshots saved.`, false)
+  const reveal = crypto.randomUUID()
+  revealable.set(reveal, files[0] ?? path)
+  if (revealable.size > 20) revealable.delete(revealable.keys().next().value ?? '')
+  emit({
+    type: 'notice',
+    message: single ? 'Screenshot saved.' : `${selected.length} screenshots saved.`,
+    error: false,
+    reveal,
+  })
   return { ok: true }
 }
 async function chooseFiles(paneId: string, multiple: boolean): Promise<void> {
@@ -386,6 +444,15 @@ function createMenu(): void {
             label: 'Select next preview',
             accelerator: 'CmdOrCtrl+Shift+]',
             click: shortcut('select-next'),
+          },
+          { type: 'separator' },
+          { label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: shortcut('zoom-in') },
+          { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: shortcut('zoom-out') },
+          { label: 'Actual size', accelerator: 'CmdOrCtrl+0', click: shortcut('zoom-reset') },
+          {
+            label: 'Rotate phones and tablets',
+            accelerator: 'CmdOrCtrl+Alt+R',
+            click: shortcut('rotate-all'),
           },
           { type: 'separator' },
           { role: 'togglefullscreen' },

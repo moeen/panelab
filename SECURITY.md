@@ -15,6 +15,9 @@ PaneLab runs websites in local browser processes and can be driven by coding age
 - Renderer isolation: context isolation, sandboxing, CSP, IPC sender checks, and the `panelab://` protocol
 - Encrypted website sessions stored with macOS `safeStorage`
 - MCP client config files PaneLab edits when you ask it to
+- Local files: the address bar, CLI, MCP server, and agent socket can open `file://` URLs, so an agent can render and read (`read_preview`) any file your account can read. Turn agent access off if that's not acceptable.
+- Page reading: `read_preview` validates everything the page returns and never returns password, one-time-code, or payment field values
+- The screenshot folder is chosen only through a native dialog in the main process; renderer commands never carry a path
 
 Bugs in the websites you preview, or in Chromium, WebKit, or Firefox themselves, belong with those projects.
 

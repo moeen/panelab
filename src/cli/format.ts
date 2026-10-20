@@ -64,6 +64,38 @@ export function inspect(value: LabResults['inspect']): string {
   return [header, differing, '', ...rows].join('\n')
 }
 
+export function read(items: LabResults['read']): string {
+  return items
+    .map((report) => {
+      if (!report.page)
+        return `${report.label}: ${report.status}${report.error ? `  ${report.error}` : ''}`
+      const { page } = report
+      const outline = page.headings.map(
+        (heading) => `${'  '.repeat(heading.level - 1)}h${heading.level} ${heading.text}`,
+      )
+      const elements = page.elements.map((element) => {
+        const state = element.state.length ? ` [${element.state.join(', ')}]` : ''
+        const value = element.value ? ` = ${JSON.stringify(element.value)}` : ''
+        const target = element.selector ?? 'no unique selector'
+        const missing = element.missingIn.length
+          ? `  (missing in ${element.missingIn.join(', ')})`
+          : ''
+        return `  ${element.role} ${JSON.stringify(element.name)}${state}${value}  ${target}${missing}`
+      })
+      const end = page.text.offset + page.text.content.length
+      const more = end < page.text.total ? `; --offset ${end} for more` : ''
+      return [
+        `${report.label}  ${page.title}  ${page.url}`,
+        ...outline,
+        `elements ${page.elements.length} of ${page.elementCount}`,
+        ...elements,
+        `text ${page.text.offset}–${end} of ${page.text.total}${more}`,
+        page.text.content,
+      ].join('\n')
+    })
+    .join('\n\n')
+}
+
 export function act(items: LabResults['act']): string {
   return items
     .map(

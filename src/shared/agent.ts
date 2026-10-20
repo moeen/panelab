@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { ConsoleEntry, NetworkEntry, PaneState } from './contracts'
 import { requestTypes } from './diagnostics'
+import { languagesSchema, mediaSchema } from './emulation'
 import { type Engine, engines } from './engines'
 import type { BoxModel, Finding, Target, TargetStatus } from './inspection'
 
@@ -46,6 +47,29 @@ export const actSchema = z
   )
 export type ActInput = z.infer<typeof actSchema>
 
+// Reading is bounded twice: text is paged by offset, elements are capped in document order.
+export const readSchema = z.object({
+  paneIds,
+  within: selector.optional(),
+  offset: z.number().int().min(0).max(10_000_000).optional(),
+  maxText: z.number().int().min(0).max(20_000).optional(),
+  maxElements: z.number().int().min(0).max(500).optional(),
+})
+export type ReadInput = z.infer<typeof readSchema>
+export const readStates = [
+  'disabled',
+  'checked',
+  'mixed',
+  'expanded',
+  'selected',
+  'pressed',
+  'required',
+  'readonly',
+  'focused',
+  'redacted',
+] as const
+export type ReadState = (typeof readStates)[number]
+
 export const labRequestSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('status') }),
   z.object({ op: z.literal('devices'), search: z.string().max(80).optional() }),
@@ -57,6 +81,9 @@ export const labRequestSchema = z.discriminatedUnion('op', [
     engines: z.array(engineSchema).min(1).max(3).optional(),
     synthetic: z.boolean().optional(),
     keep: z.boolean().optional(),
+    // Media features for the new previews; languages apply to the whole workspace.
+    media: mediaSchema.partial().optional(),
+    languages: languagesSchema.optional(),
     timeoutMs,
   }),
   z.object({ op: z.literal('panes') }),
@@ -100,6 +127,7 @@ export const labRequestSchema = z.discriminatedUnion('op', [
     limit: z.number().int().min(1).max(1000).optional(),
   }),
   z.object({ op: z.literal('css'), css: z.string().max(200_000), enabled: z.boolean().optional() }),
+  readSchema.extend({ op: z.literal('read') }),
   z.object({
     op: z.literal('diff'),
     baseline: absolutePath.optional(),
@@ -137,6 +165,37 @@ export type PaneSummary = {
 }
 export type ActOutcome = 'done' | 'missing' | 'ambiguous' | 'timeout' | 'unavailable'
 export type ActReport = { paneId: string; status: ActOutcome; error: string | null }
+// `selector` and `text` are verified to match only this element, so `act` can use them as given.
+export type ReadElement = {
+  role: string
+  name: string
+  tag: string
+  state: ReadState[]
+  value: string | null
+  href: string | null
+  inViewport: boolean
+  selector: string | null
+  text: string | null
+  // Previews (by label) with no element of the same role and name.
+  missingIn: string[]
+}
+export type PageRead = {
+  title: string
+  url: string
+  lang: string
+  headings: { level: number; text: string }[]
+  landmarks: { role: string; name: string }[]
+  text: { content: string; offset: number; total: number }
+  elements: ReadElement[]
+  elementCount: number
+}
+export type ReadReport = {
+  paneId: string
+  label: string
+  status: 'read' | 'missing' | 'ambiguous' | 'unavailable'
+  error: string | null
+  page: PageRead | null
+}
 export type Shot = {
   paneId: string
   label: string
@@ -198,6 +257,7 @@ export type LabResults = {
   network: { paneId: string; entries: NetworkEntry[] }[]
   css: { dropped: { paneId: string; declarations: string[] }[] }
   diff: DiffEntry[]
+  read: ReadReport[]
 }
 export type LabRequests = { [R in LabRequest as R['op']]: R }
 

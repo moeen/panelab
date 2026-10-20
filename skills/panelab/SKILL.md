@@ -9,7 +9,7 @@ PaneLab renders one URL in real Chromium, WebKit (Safari-compatible), and Firefo
 
 ## Choose an interface
 
-- **MCP tools** (`panelab` server): `open_preview`, `screenshot`, `scan_findings`, `inspect_element`, `act`, `reload`, `visual_diff`, `set_live_css`, `get_console` and `get_network` (filter with `query`, `types`, `errorsOnly`/`failedOnly`), `list_devices`.
+- **MCP tools** (`panelab` server): `open_preview`, `screenshot`, `scan_findings`, `inspect_element`, `read_preview`, `act`, `reload`, `visual_diff`, `set_live_css`, `get_console` and `get_network` (filter with `query`, `types`, `errorsOnly`/`failedOnly`), `list_devices`.
 - **CLI**: `panelab <command> <url> -d <device> -e <engines>`. Output is JSON when piped. Exit codes: 0 ok, 1 failed check, 2 usage, 3 engine or app unavailable.
 
 If the PaneLab app is open with agent access on, both drive its **Agent** workspace so the user watches live. Otherwise they run headless previews that close when the command ends.
@@ -27,6 +27,8 @@ If the PaneLab app is open with agent access on, both drive its **Agent** worksp
 9. Rerun the scan to confirm the finding is gone.
 
 ## Interacting
+
+Start with `read_preview` / `panelab read <url>` to see each preview's headings, visible text, and operable elements. Every element's `selector` (and `text`, when present) is verified to match only that element, so pass it to `act` unchanged. Page through long text with `offset`; narrow with `within`. `missingIn` lists previews where an element is absent.
 
 `act` clicks, fills, presses, hovers, scrolls, or waits by CSS selector or visible text in every preview at once. Each preview reports `done`, `missing`, `ambiguous`, or `timeout`; ambiguous selectors are never guessed, so narrow them. No arbitrary JavaScript runs.
 

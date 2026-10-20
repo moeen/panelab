@@ -307,3 +307,75 @@ describe('request schema', () => {
     expect(labRequestSchema.safeParse({ op: 'evaluate', script: '1' }).success).toBe(false)
   })
 })
+
+describe('reading previews', () => {
+  const element = (name: string, role = 'button') => ({
+    role,
+    name,
+    tag: 'button',
+    state: [],
+    value: null,
+    href: null,
+    inViewport: true,
+    selector: `#${name.toLowerCase()}`,
+    text: name,
+    missingIn: [],
+  })
+  const page = (names: string[], elementCount = names.length) => ({
+    title: 'Fixture',
+    url: 'https://example.test/',
+    lang: 'en',
+    headings: [],
+    landmarks: [],
+    text: { content: '', offset: 0, total: 0 },
+    elements: names.map((name) => element(name)),
+    elementCount,
+  })
+  test('labels each preview and names previews that lack an element', async () => {
+    const pages = [page(['Buy', 'Menu']), page(['Buy']), page(['Buy'], 40)]
+    const fake = fakeBackend({
+      reply: (command) =>
+        command.type === 'page.read'
+          ? {
+              ok: true,
+              read: command.paneIds.map((paneId, index) => ({
+                paneId,
+                label: '',
+                status: 'read',
+                error: null,
+                page: pages[index] ?? null,
+              })),
+            }
+          : undefined,
+    })
+    const lab = new Lab(fake.backend)
+    await lab.call({
+      op: 'open',
+      url: 'example.test',
+      devices: ['pixel-7', 'iphone-16', 'macbook-air-13'],
+    })
+    const reports = await lab.call({ op: 'read', maxText: 100 })
+    expect(reports.map((report) => report.label)).toEqual([
+      'Pixel 6 / 7 / 8 · Chromium',
+      'iPhone 15 / 16 · WebKit',
+      'MacBook Air 13.6″ · Chromium',
+    ])
+    const [first, second, third] = reports
+    // Only complete element lists prove absence, so the truncated third preview never counts.
+    expect(first?.page?.elements.find((item) => item.name === 'Menu')?.missingIn).toEqual([
+      second?.label,
+    ])
+    expect(first?.page?.elements.find((item) => item.name === 'Buy')?.missingIn).toEqual([])
+    expect(third?.page?.elements[0]?.missingIn).toEqual([])
+    expect(fake.commands.at(-1)).toMatchObject({ type: 'page.read', input: { maxText: 100 } })
+  })
+  test('rejects unbounded reads before they reach a preview', () => {
+    for (const value of [
+      { op: 'read', maxText: 20_001 },
+      { op: 'read', maxElements: 501 },
+      { op: 'read', offset: -1 },
+      { op: 'read', within: ' ' },
+    ])
+      expect(labRequestSchema.safeParse(value).success).toBe(false)
+  })
+})

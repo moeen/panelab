@@ -88,6 +88,95 @@ test.describe('runtime agent commands', () => {
     ).rejects.toThrow(/No preview/)
   })
 
+  test('page.read reports what a person sees with act-ready selectors and no secrets', async ({
+    runtime,
+    site,
+  }) => {
+    await runtime.execute({ type: 'navigate', url: `${site.url}/read`, paneIds: ['source'] })
+    const read = async (input: Parameters<typeof runtime.execute>[0] & { type: 'page.read' }) => {
+      const [report] = (await runtime.execute(input)).read ?? []
+      return report
+    }
+    const report = await read({ type: 'page.read', paneIds: ['source'], input: {} })
+    const page = report?.page
+    if (!page) throw new Error(report?.error ?? 'Nothing read')
+    expect(page).toMatchObject({ title: 'Read fixture', lang: 'en', url: `${site.url}/read` })
+    expect(page.headings).toEqual([
+      { level: 1, text: 'Checkout' },
+      { level: 2, text: 'Account' },
+    ])
+    expect(page.landmarks).toEqual(
+      expect.arrayContaining([
+        { role: 'navigation', name: 'Primary' },
+        { role: 'main', name: '' },
+        { role: 'form', name: 'Sign in' },
+      ]),
+    )
+    expect(page.text.content).toContain('Review your order before paying.')
+    expect(JSON.stringify(page)).not.toMatch(/hunter2|4111111111111111|Hidden/)
+    const named = (name: string) => page.elements.filter((element) => element.name === name)
+    expect(named('Email')[0]).toMatchObject({
+      role: 'textbox',
+      value: 'me@example.com',
+      state: ['required'],
+      selector: '#email',
+    })
+    expect(named('Password')[0]).toMatchObject({ value: null, state: ['redacted'] })
+    expect(named('Card number')[0]).toMatchObject({ value: null, state: ['redacted'] })
+    expect(named('Remember me')[0]).toMatchObject({ role: 'checkbox', state: ['checked'] })
+    expect(named('Volume')[0]).toMatchObject({ role: 'slider', value: '30' })
+    expect(named('More')[0]).toMatchObject({ role: 'button', state: ['expanded'] })
+    expect(named('Pay')[0]).toMatchObject({ state: ['disabled'] })
+    expect(named('Footer link')[0]).toMatchObject({ role: 'link', inViewport: false })
+    expect(named('Sign in')[0]).toMatchObject({ role: 'button', text: 'Sign in' })
+    const adds = named('Add')
+    expect(adds).toHaveLength(2)
+    expect(adds.map((element) => element.text)).toEqual([null, null])
+    expect(new Set(adds.map((element) => element.selector)).size).toBe(2)
+    const second = adds[1]?.selector
+    if (!second) throw new Error('No unique selector for the second Add button')
+    expect(
+      (
+        await runtime.execute({
+          type: 'act',
+          paneIds: ['source'],
+          input: { action: 'click', selector: second },
+        })
+      ).act?.[0]?.status,
+    ).toBe('done')
+    const again = await read({ type: 'page.read', paneIds: ['source'], input: {} })
+    expect(again?.page?.elements.filter((element) => element.name === 'Added')).toHaveLength(1)
+
+    const first = await read({
+      type: 'page.read',
+      paneIds: ['source'],
+      input: { maxText: 10, maxElements: 2 },
+    })
+    expect(first?.page).toMatchObject({ text: { offset: 0 }, elementCount: page.elementCount })
+    expect(first?.page?.text.content).toBe(page.text.content.slice(0, 10))
+    expect(first?.page?.elements).toHaveLength(2)
+    const next = await read({
+      type: 'page.read',
+      paneIds: ['source'],
+      input: { offset: 10, maxText: 10 },
+    })
+    expect(next?.page?.text.content).toBe(page.text.content.slice(10, 20))
+
+    const scoped = await read({
+      type: 'page.read',
+      paneIds: ['source'],
+      input: { within: '#account' },
+    })
+    expect(scoped?.page?.headings).toEqual([{ level: 2, text: 'Account' }])
+    expect(scoped?.page?.elements.map((element) => element.name)).not.toContain('Home')
+    expect(
+      await read({ type: 'page.read', paneIds: ['source'], input: { within: '#nope' } }),
+    ).toMatchObject({ status: 'missing', page: null })
+    expect(
+      await read({ type: 'page.read', paneIds: ['source'], input: { within: 'li' } }),
+    ).toMatchObject({ status: 'ambiguous', page: null })
+  })
+
   test('captures CSS-scale JPEG previews', async ({ runtime, site, directory }) => {
     await runtime.execute({ type: 'navigate', url: `${site.url}/inspect`, paneIds: ['source'] })
     const path = join(directory, 'small.jpg')
@@ -182,7 +271,11 @@ test.describe('headless Lab', () => {
           'inspect_element',
           'act',
           'visual_diff',
+          'read_preview',
         ]),
+      )
+      expect(tools.find((tool) => tool.name === 'read_preview')?.annotations?.readOnlyHint).toBe(
+        true,
       )
       expect(tools.find((tool) => tool.name === 'scan_findings')?.annotations?.readOnlyHint).toBe(
         true,
@@ -197,6 +290,11 @@ test.describe('headless Lab', () => {
       expect(opened.structuredContent).toMatchObject({
         mode: 'headless',
         panes: [{ engine, status: 'ready' }],
+      })
+
+      const reading = await client.callTool({ name: 'read_preview', arguments: { maxText: 50 } })
+      expect(reading.structuredContent).toMatchObject({
+        previews: [{ status: 'read', page: { text: { offset: 0 } } }],
       })
 
       const shot = await client.callTool({ name: 'screenshot', arguments: {} })

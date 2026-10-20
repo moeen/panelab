@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   active,
@@ -241,6 +241,44 @@ test('rotation, resize and zoom to preview preserve emulation and saved layout',
   expect(reportFor(site, phone.id).width).toBe(844)
 })
 
+test('rotate all turns phones and tablets together and leaves desktops alone', async ({
+  application,
+  site,
+}) => {
+  const { app, page } = application
+  await openSite(page, site)
+  const before = active(await snapshot(page)).panes
+  await page.getByRole('button', { name: 'Rotate phones and tablets' }).click()
+  await expect
+    .poll(async () => active(await snapshot(page)).panes.map((pane) => pane.deviceId))
+    .toEqual(['mac-laptop', 'iPhone 13 landscape', 'Pixel 7 landscape'])
+  const phone = before.find((pane) => pane.deviceId === 'iPhone 13')
+  if (!phone) throw new Error('Phone missing')
+  await expect.poll(() => reportFor(site, phone.id).width).toBe(844)
+  // Each preview keeps its scale, so the rotated frame grows by the viewport's aspect change.
+  const after = active(await snapshot(page)).panes
+  expect(after.find((pane) => pane.id === phone.id)?.layout.w).toBeCloseTo(
+    (phone.layout.w * 844) / 390,
+    0,
+  )
+  expect(after.find((pane) => pane.deviceId === 'mac-laptop')?.layout).toEqual(
+    before.find((pane) => pane.deviceId === 'mac-laptop')?.layout,
+  )
+  // The View menu runs the same command and turns them back.
+  expect(
+    await app.evaluate(({ Menu }) => {
+      const item = Menu.getApplicationMenu()
+        ?.items.flatMap((menu) => menu.submenu?.items ?? [])
+        .find((entry) => entry.label === 'Rotate phones and tablets')
+      item?.click()
+      return item?.accelerator
+    }),
+  ).toBe('CmdOrCtrl+Alt+R')
+  await expect
+    .poll(async () => active(await snapshot(page)).panes.map((pane) => pane.deviceId))
+    .toEqual(before.map((pane) => pane.deviceId))
+})
+
 test('fixture clipboard preserves host clipboard and transfers website text', async ({
   application,
   site,
@@ -327,6 +365,49 @@ test('website dialogs, uploads, downloads and screenshots use authorized tempora
   expect((await readdir(directory)).filter((name) => name.endsWith('.png'))).toEqual([
     'screenshot.png',
   ])
+})
+
+test('a saved screenshot folder skips save dialogs, reveals captures, and falls back when missing', async ({
+  application,
+  site,
+  directory,
+}) => {
+  const { page, app } = application
+  const workspace = await openSite(page, site)
+  const folder = join(directory, 'shots')
+  await mkdir(folder)
+  await app.evaluate((_electron, path) => {
+    globalThis.panelabTest.openPaths = [path]
+    globalThis.panelabTest.savePath = null
+  }, folder)
+  await page.getByRole('button', { name: 'Workspace options' }).click()
+  await page.getByRole('button', { name: 'Choose folder…' }).click()
+  await expect.poll(async () => (await snapshot(page)).settings.screenshotFolder).toBe(folder)
+  await expect(page.getByTitle(folder)).toHaveText('shots')
+  await page.keyboard.press('Escape')
+  // A dialog would now cancel, so every saved file proves the folder was used directly.
+  await app.evaluate(() => {
+    globalThis.panelabTest.openPaths = []
+  })
+  await page.getByRole('button', { name: 'Capture all previews' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'screenshots saved.' })).toBeVisible()
+  const pngs = async () => (await readdir(folder)).filter((name) => name.endsWith('.png'))
+  expect(await pngs()).toHaveLength(workspace.panes.length)
+  await page.getByRole('button', { name: 'Show in Finder' }).click()
+  await expect
+    .poll(() => app.evaluate(() => globalThis.panelabTest.revealed))
+    .toEqual([expect.stringContaining(folder)])
+  const [first] = workspace.panes
+  if (!first) throw new Error('Pane missing')
+  await command(page, { type: 'capture', paneIds: [first.id], fullPage: true })
+  expect(await pngs()).toHaveLength(workspace.panes.length + 1)
+
+  await rm(folder, { recursive: true })
+  await command(page, { type: 'capture', paneIds: [first.id], fullPage: false })
+  await expect(page.getByRole('alert')).toContainText('screenshot folder is missing')
+  expect((await snapshot(page)).settings.screenshotFolder).toBe(folder)
+  await command(page, { type: 'screenshots.folder', action: 'clear' })
+  expect((await snapshot(page)).settings.screenshotFolder).toBeNull()
 })
 
 test('runtime process failure stays visible and reload restarts the owned process', async ({

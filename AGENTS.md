@@ -26,9 +26,10 @@ Maintain focused unit, renderer, integration, and end-to-end coverage for behavi
 - `src/main`: application lifecycle, native dialogs, clipboard, settings, encrypted session snapshots, explicit engine downloads/cache cleanup, and runtime coordination.
 - `src/preload`: sandbox-compatible CommonJS bridge. Expose only `bootstrap`, `send`, and `subscribe`; never expose raw IPC or filesystem access.
 - `src/runtime`: Playwright process ownership, device resolution, streamed frames, input/synchronization, and diagnostics. Browser complexity belongs behind `BrowserRuntime.execute`.
-  - `page-agent.ts` is the only code that runs inside website documents (sync capture and the inspection API). It is serialized as an init script, so it must stay self-contained; `agent.ts` validates everything it returns.
+  - `page-agent.ts` is the only code that runs inside website documents (sync capture, page reading, and the inspection API). It is serialized as an init script, so it must stay self-contained; `agent.ts` validates everything it returns.
   - `inspection.ts` owns selection, highlights, Live CSS/inline overrides, and scans; `findings.ts` is the pure ranking logic. Element matching across panes uses `resolveTarget` in `sync.ts`, shared with synchronization.
 - `src/shared/inspection.ts`: inspection commands, events, and bounded schemas for website-reported data.
+- `src/shared/emulation.ts`: per-preview media features and per-workspace website languages. Media changes apply live with `emulateMedia`; a language change recreates contexts because locale is fixed per context.
 - `src/shared/agent.ts`: the Lab API contract (bounded request schemas, result types, socket framing) shared by the CLI, MCP server, and app socket.
 - `src/core`: Node-only and never imports Electron. `lab.ts` is the agent-facing facade over a `LabBackend` (workspace + runtime commands + events). `headless.ts` hosts `BrowserRuntime` in-process. `remote.ts`/`connect.ts` attach to the app socket. `clients.ts`/`install.ts` write MCP client configs, the CLI shim, and skills. `diff.ts` compares PNGs.
 - `src/cli` and `src/mcp`: thin adapters over `LabApi`. Keep logic in `core`; the MCP server writes only protocol frames to stdout.

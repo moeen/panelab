@@ -146,7 +146,6 @@ export function resolveDevice(
       isMobile: profile.isMobile,
       hasTouch: profile.hasTouch,
       userAgent: device.userAgent,
-      locale: 'en-US',
       acceptDownloads: true,
     },
   }

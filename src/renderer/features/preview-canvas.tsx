@@ -300,7 +300,9 @@ export function PreviewCanvas({
             return
           }
           const shortcut = event.metaKey || event.ctrlKey ? key.toLowerCase() : null
+          // Menu accelerators: address, reload, rotate, and canvas zoom stay with the app.
           if (event.metaKey && (shortcut === 'l' || shortcut === 'r')) return
+          if (event.metaKey && ['Equal', 'Minus', 'Digit0'].includes(event.code)) return
           if (shortcut === 'c' || shortcut === 'x' || shortcut === 'v') {
             event.preventDefault()
             void send({

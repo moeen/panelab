@@ -26,13 +26,17 @@ describe('website URL boundary', () => {
     ['myapp.test:5173', 'https://myapp.test:5173/'],
     ['example.com:8080/a', 'https://example.com:8080/a'],
     ['app.localhost:3000', 'http://app.localhost:3000/'],
+    ['file:///Users/me/site/index.html', 'file:///Users/me/site/index.html'],
+    ['FILE://localhost/tmp/a.html#top', 'file:///tmp/a.html#top'],
+    ['/Users/me/My Site/index.html?x=1', 'file:///Users/me/My%20Site/index.html?x=1'],
   ])('%s normalizes to %s', (input, expected) => expect(normalizeUrl(input)).toBe(expected))
   test.each(['', ' ', 'https://user:password@example.com', 'http://[broken'])(
     'rejects %j',
     (input) => expect(() => normalizeUrl(input)).toThrow(),
   )
+  test('rejects files on other hosts', () =>
+    expect(() => normalizeUrl('file://server/share/a.html')).toThrow('absolute path'))
   test.each([
-    'file:///etc/passwd',
     'javascript:alert(1)',
     'data:text/html,x',
     'ftp://example.com',
@@ -40,8 +44,10 @@ describe('website URL boundary', () => {
     'chrome://settings',
     'smb://share/folder',
     'custom-app://open',
-  ])('explains that %j is not a website address', (input) =>
-    expect(() => normalizeUrl(input)).toThrow('Only HTTP and HTTPS websites are supported.'),
+  ])('explains that %j is not a page address', (input) =>
+    expect(() => normalizeUrl(input)).toThrow(
+      'Only HTTP, HTTPS and local file addresses are supported.',
+    ),
   )
 })
 
@@ -61,6 +67,8 @@ describe('validated external input', () => {
     { type: 'engines.set', enabled: ['firefox', 'firefox'] },
     { type: 'engines.clear', engine: '../chromium' },
     { type: 'engines.install', engine: 'chrome' },
+    { type: 'screenshots.folder', action: 'set' },
+    { type: 'screenshots.reveal', id: '../escape' },
   ])('rejects renderer command %j', (value) =>
     expect(commandSchema.safeParse(value).success).toBe(false),
   )
@@ -146,6 +154,7 @@ describe('validated external input', () => {
           engine: pane.engine,
           synthetic: pane.synthetic,
           layout: pane.layout,
+          media: pane.media,
         },
       ],
     }

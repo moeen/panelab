@@ -54,13 +54,14 @@ args = ["mcp"]
 | `screenshot` | Device-pixel PNG files, plus small inline JPEG previews |
 | `scan_findings` | Ranked overflow, engine-difference, unsupported-CSS, engine-only error, and mobile findings |
 | `inspect_element` | One element matched across previews, with the computed values that differ |
+| `read_preview` | Title, headings, landmarks, visible text paged by `offset`, and operable elements with role, accessible name, state, and a selector verified unique for `act`; `missingIn` names previews without that element |
 | `get_console`, `get_network` | Recent diagnostics per preview |
 | `set_live_css` | Try CSS in every preview without touching project files |
 | `visual_diff` | Diff engines per device, or compare against a baseline folder |
 
 Every tool declares input and output schemas and read-only or destructive hints. Errors come back as tool errors with a suggested next step. The server also exposes `panelab://devices` and `panelab://previews` resources and a `responsive_audit` prompt.
 
-Agents can't run arbitrary JavaScript. An action whose target is missing or matches more than one element reports `missing` or `ambiguous` instead of guessing.
+Agents can't run arbitrary JavaScript. An action whose target is missing or matches more than one element reports `missing` or `ambiguous` instead of guessing. `read_preview` never returns password, one-time-code, or payment field values; those elements carry the `redacted` state. It reads the main frame's light DOM: content inside iframes and shadow roots isn't listed, though `act` selectors can still reach open shadow roots. `open_preview` accepts `media` (for example `{ "colorScheme": "dark" }`) and `languages` (for example `["de-DE", "en"]`), and URLs may be local files.
 
 ## CLI
 
@@ -69,7 +70,9 @@ panelab devices --search pixel
 panelab shot localhost:3000 -d iphone-16 -d pixel-7 --out shots
 panelab scan localhost:3000 -d iphone-16 -d macbook-air-13 -e webkit,chromium
 panelab inspect localhost:3000 '.hero h1' -d iphone-16 -e webkit,chromium --synthetic
+panelab read localhost:3000 -d iphone-16 --within main --limit 50
 panelab act localhost:3000 click 'button[aria-label="Menu"]' -d iphone-16
+panelab open ./dist/index.html -d pixel-7 --dark --lang de-DE,en
 panelab diff localhost:3000 -d macbook-air-13 --baseline .panelab/baseline   # first run saves, later runs compare
 panelab watch localhost:3000 -d iphone-16 --paths src --run scan
 ```

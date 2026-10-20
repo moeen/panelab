@@ -191,6 +191,19 @@ test('reports command failures unless quiet and notices expire without stale tim
   expect(store.root().notice).toBeNull()
 })
 
+test('a notice with an action waits while it is held and expires after release', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const reveal = crypto.randomUUID()
+  receive({ type: 'notice', message: '3 screenshots saved.', error: false, reveal })
+  expect(store.root().notice).toEqual({ message: '3 screenshots saved.', error: false, reveal })
+  store.holdNotice(true)
+  await vi.advanceTimersByTimeAsync(20_000)
+  expect(store.root().notice?.reveal).toBe(reveal)
+  store.holdNotice(false)
+  await vi.advanceTimersByTimeAsync(3500)
+  expect(store.root().notice).toBeNull()
+})
+
 test('queues website dialogs and removes only the resolved pane dialog', () => {
   const first = { id: 'a', paneId: 'first', kind: 'alert', message: 'First', defaultValue: '' }
   const second = { ...first, id: 'b', paneId: 'second', message: 'Second' }

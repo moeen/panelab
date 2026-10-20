@@ -75,8 +75,17 @@
           cookie: document.cookie, database, uploaded,
           scroll: scrolling.scrollTop / Math.max(1, scrolling.scrollHeight - scrolling.clientHeight),
           containerScroll: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight), boxes,
+          language: navigator.language,
+          media: Object.fromEntries(Object.entries(mediaQueries).map(([name, query]) => [name, matchMedia(query).matches])),
         }) })
       }
+      const mediaQueries = {
+        dark: '(prefers-color-scheme: dark)',
+        reducedMotion: '(prefers-reduced-motion: reduce)',
+        contrast: '(prefers-contrast: more)',
+        forcedColors: '(forced-colors: active)',
+      }
+      for (const query of Object.values(mediaQueries)) matchMedia(query).addEventListener('change', () => report())
       if (location.pathname === '/missing') element('counter').remove()
       if (location.pathname === '/ambiguous') {
         const duplicate = element('counter').cloneNode(true)

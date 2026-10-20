@@ -13,6 +13,7 @@ import {
   type RuntimeMessage,
   type Workspace,
 } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 import { startSite } from './site'
 
 const frameSchema = z.object({
@@ -117,12 +118,14 @@ export const test = base.extend<Fixture>({
       name: 'Runtime fixture',
       url: site.url,
       sync: { ...defaultSync },
+      languages: ['en-US'],
       agent: false,
       panes: ['source', 'follower', 'excluded'].map((id, index) => ({
         id,
         engine,
         deviceId: 'mac-laptop',
         synthetic: false,
+        media: { ...defaultMedia },
         excluded: id === 'excluded',
         url: `${site.url}/?pane=${id}`,
         layout: { x: index * 768, y: 0, w: 720 },

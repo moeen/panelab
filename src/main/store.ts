@@ -30,6 +30,7 @@ export class WorkspaceStore {
         presets: [],
         styleEdits: 'inline' as const,
         agentAccess: false,
+        screenshotFolder: null,
       }
     }
     try {

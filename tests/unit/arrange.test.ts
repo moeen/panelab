@@ -8,6 +8,7 @@ import {
   widthAt,
 } from '../../src/shared/arrange'
 import { layoutSchema, type PaneConfig } from '../../src/shared/contracts'
+import { defaultMedia } from '../../src/shared/emulation'
 import type { Engine } from '../../src/shared/engines'
 
 function pane(id: string, engine: Engine, w: number): PaneConfig {
@@ -18,6 +19,7 @@ function pane(id: string, engine: Engine, w: number): PaneConfig {
     url: '',
     excluded: false,
     synthetic: false,
+    media: { ...defaultMedia },
     layout: { x: 999, y: 999, w },
   }
 }
