@@ -17,7 +17,7 @@
 
 The first launch asks which engines to download. Chromium and WebKit start checked and Firefox doesn't. Nothing downloads until you select **Download selected engines**, and you can continue once one selected engine is ready while the rest finish in the background.
 
-Change engines later in **Settings… (⌘,)** or **Workspace options → Browser engines**. Turning an engine off pauses its previews but keeps its files and sessions. Settings shows disk use per engine and in total, and **Remove downloads** deletes a disabled engine's files without touching workspaces or sign-ins.
+Change engines later in **Settings… (⌘,) → Browser engines**, or from **Workspace options → Browser engines**. Turning an engine off pauses its previews but keeps its files and sessions. Settings shows disk use per engine and in total, and **Remove downloads** deletes a disabled engine's files without touching workspaces or sign-ins.
 
 PaneLab keeps its browsers in `browsers/` inside its data folder and only downloads pinned builds you selected. It ignores Playwright's shared cache and never downloads at startup. If a build is missing after an upgrade or an interrupted download, the engine row offers a retry. For Chromium it downloads only Playwright's headless shell.
 
@@ -90,7 +90,7 @@ The drawer below the canvas has five tabs.
 
 Click a finding to select its element in every preview. Navigating marks results stale.
 
-**Live CSS** applies the CSS you type to every preview through one constructed stylesheet. It survives reloads and navigation until you quit or switch workspaces, and you can toggle it off to compare. Declarations an engine ignores are listed per preview. Editing a value in Elements either sets an inline style (the default) or adds an `!important` rule here; pick under **Style edits** in workspace options. CSS an agent applies shows up in the editor too. PaneLab never writes to your project files.
+**Live CSS** applies the CSS you type to every preview through one constructed stylesheet. It survives reloads and navigation until you quit or switch workspaces, and you can toggle it off to compare. Declarations an engine ignores are listed per preview. Editing a value in Elements either sets an inline style (the default) or adds an `!important` rule here; pick under **Settings → General → Style edits**. CSS an agent applies shows up in the editor too. PaneLab never writes to your project files.
 
 Inspection covers the main frame. An iframe is inspected as the `<iframe>` element, and cross-origin stylesheets can't be read from the page.
 
@@ -104,13 +104,34 @@ Sessions are saved every 30 seconds, on workspace switches, and on quit. **Works
 
 ## Screenshots
 
-**Capture all previews** in the toolbar and `⌘⇧S` (selected preview) ask where to save. Choose a folder under **Workspace options → Screenshots** to save there directly; files are named by device, engine, and time. The saved notice has **Show in Finder**. If the folder is missing or read-only, PaneLab says so and asks again.
+**Capture all previews** in the toolbar and `⌘⇧S` (selected preview) ask where to save. Choose a folder under **Settings → General → Screenshots** to save there directly; files are named by device, engine, and time. The saved notice has **Show in Finder**. If the folder is missing or read-only, PaneLab says so and asks again.
+
+## Settings
+
+**Settings… (⌘,)** has three sections. **General** holds appearance, how Elements applies style edits, the screenshot folder, and updates. **Browser engines** and **Agents and MCP** are described in their own sections. Workspace options keeps only workspace-level actions: website languages, rename, reset sessions, and delete.
+
+## Updates
+
+PaneLab checks GitHub Releases once a day and when you choose **PaneLab → Check for Updates…**. Turn automatic checks off in **Settings → General**. A check is one anonymous request to `api.github.com`; it carries no identifiers.
+
+When a newer version exists, the title bar shows **Update 0.x.y**. Open it (or **About PaneLab**) and select **Download update**. PaneLab downloads the release zip, then verifies it before staging anything:
+
+1. The release's `SHA256SUMS.txt` must carry a valid Ed25519 signature from the PaneLab release key built into the app.
+2. The zip must match its signed checksum.
+3. The extracted bundle must be `dev.panelab.app` at the announced version, with an intact code signature.
+
+**Restart to update** saves your sessions, quits, swaps the app bundle, and reopens PaneLab. If you quit instead, the update installs on the way out. A failed swap restores the previous app and tells you on the next launch.
+
+PaneLab updates in place only when it can write to its own folder. If it runs from Downloads (macOS App Translocation), a read-only volume, or a folder you can't write to, About explains why and offers **Download manually**. Development builds never replace themselves.
 
 ## Keyboard shortcuts
 
+**Help → Keyboard Shortcuts (⌘/)** lists every shortcut and filters as you type.
+
 | Shortcut | Action |
 | --- | --- |
-| `⌘,` | Browser engine settings |
+| `⌘,` | Settings |
+| `⌘/` | Keyboard shortcuts |
 | `⌘L` | Focus the address bar |
 | `⌘R` | Reload all previews |
 | `⌘⇧S` | Screenshot the selected preview |
@@ -139,7 +160,7 @@ Click a preview to send it keyboard input, and press Escape to give keys like Sp
 
 ## Data and privacy
 
-PaneLab has no accounts, cloud service, or telemetry. Websites still make their own network requests.
+PaneLab has no accounts, cloud service, or telemetry. Websites still make their own network requests, and update checks contact GitHub (see [Updates](#updates)).
 
 Data lives in `~/Library/Application Support/PaneLab`. Settings are a versioned JSON file written atomically; if it can't be read, PaneLab keeps the original and starts fresh. Each workspace's session is a separate file encrypted with Electron `safeStorage` and the macOS Keychain. There's no plaintext fallback. A session file that can't be decrypted is renamed with `.unreadable-` and kept, so later saves don't overwrite it.
 
@@ -154,6 +175,8 @@ PANELAB_DATA_DIR=/tmp/panelab-dev pnpm dev
 ## Troubleshooting
 
 **macOS says PaneLab is damaged or can't be opened.** Release builds are unsigned. Run `xattr -dr com.apple.quarantine /Applications/PaneLab.app` once, then open it again.
+
+**Updates say PaneLab can't replace itself.** Move `PaneLab.app` to `/Applications` and open it from there, or use **Download manually**.
 
 **Engine unavailable.** Open **Browser engines**, enable the engine, and select **Download** or **Retry download**. Paused previews resume when it's ready.
 

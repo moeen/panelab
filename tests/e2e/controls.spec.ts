@@ -151,3 +151,43 @@ test('console and network inspectors show generated website diagnostics', async 
   await page.getByLabel('Clear inspector').click()
   await expect(page.getByText('No matching requests', { exact: true })).toBeVisible()
 })
+
+test('menus open About, keyboard shortcuts, and tabbed settings', async ({ application }) => {
+  const { app, page } = application
+  const menu = (label: string) =>
+    app.evaluate(({ Menu }, label) => {
+      const item = Menu.getApplicationMenu()
+        ?.items.flatMap((entry) => entry.submenu?.items ?? [])
+        .find((entry) => entry.label === label)
+      item?.click()
+      return item?.accelerator ?? null
+    }, label)
+  expect(await menu('Keyboard Shortcuts')).toBe('CmdOrCtrl+/')
+  const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(sheet.getByText('Select element')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  expect(await menu('About PaneLab')).toBeNull()
+  const about = page.getByRole('dialog', { name: 'PaneLab' })
+  const version = await app.evaluate(({ app }) => app.getVersion())
+  await expect(about.getByText(`Version ${version}`)).toBeVisible()
+  await about.getByRole('button', { name: 'Report an issue' }).click()
+  await expect
+    .poll(() => app.evaluate(() => globalThis.panelabTest.opened))
+    .toEqual(['https://github.com/moeen/panelab/issues/new/choose'])
+  await about.getByRole('button', { name: 'Check now' }).click()
+  await expect(about.getByText('PaneLab is up to date.')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  expect(await menu('Settings…')).toBe('CmdOrCtrl+,')
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await expect(settings.getByRole('tab', { name: 'General' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await settings.getByLabel('Appearance').selectOption('dark')
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await settings.getByRole('tab', { name: 'Browser engines' }).click()
+  await expect(settings.getByText('Disk use', { exact: true })).toBeVisible()
+  await expect.poll(async () => (await snapshot(page)).settings.updateCheckedAt).not.toBeNull()
+})

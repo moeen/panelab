@@ -19,6 +19,7 @@ import {
   styleEditModes,
 } from './inspection'
 import { type PagePicker, pickerIdSchema, pickerIndexSchema } from './picker'
+import type { ShortcutAction } from './shortcuts'
 
 export {
   type Engine,
@@ -147,6 +148,9 @@ export const settingsSchema = z.object({
   agentAccess: z.boolean().default(false),
   // Chosen through a native dialog in main; captures save here without asking.
   screenshotFolder: z.string().max(4096).nullable().default(null),
+  autoUpdate: z.boolean().default(true),
+  // Epoch milliseconds of the last completed update check, so restarts do not repeat it.
+  updateCheckedAt: z.number().nonnegative().nullable().default(null),
 })
 export const legacySettingsSchema = settingsSchema
   .omit({ enabledEngines: true, engineSetupComplete: true })
@@ -178,6 +182,8 @@ export const inputSchema = z.discriminatedUnion('kind', [
 ])
 export type PreviewInput = z.infer<typeof inputSchema>
 
+export const linkTargets = ['releases', 'repo', 'issues', 'license'] as const
+export type LinkTarget = (typeof linkTargets)[number]
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('engines.set'), enabled: engineList }),
   z.object({ type: z.literal('engines.install'), engine: engineSchema }),
@@ -244,6 +250,12 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('agent.client.config'), client: z.enum(agentClients) }),
   z.object({ type: z.literal('agent.status') }),
   z.object({ type: z.literal('agent.disconnect') }),
+  z.object({ type: z.literal('update.check') }),
+  z.object({ type: z.literal('update.download') }),
+  z.object({ type: z.literal('update.install') }),
+  z.object({ type: z.literal('update.auto.set'), enabled: z.boolean() }),
+  // Main maps each target to a fixed URL; the renderer never supplies one.
+  z.object({ type: z.literal('open.link'), target: z.enum(linkTargets) }),
   ...inspectCommandSchemas,
 ])
 export type AppCommand = z.infer<typeof commandSchema>
@@ -359,22 +371,8 @@ export type AppEvent =
   // `reveal` names saved screenshots that `screenshots.reveal` can show in Finder.
   | { type: 'notice'; message: string; error: boolean; reveal?: string }
   | { type: 'agent'; status: AgentStatus }
-  | {
-      type: 'shortcut'
-      action:
-        | 'address'
-        | 'back'
-        | 'capture'
-        | 'forward'
-        | 'inspect'
-        | 'reload'
-        | 'rotate-all'
-        | 'select-next'
-        | 'settings'
-        | 'zoom-in'
-        | 'zoom-out'
-        | 'zoom-reset'
-    }
+  | { type: 'update'; status: UpdateStatus }
+  | { type: 'shortcut'; action: ShortcutAction }
   | InspectEvent
 
 export type EngineInstallation = {
@@ -388,12 +386,31 @@ export type EngineSnapshot = {
   sharedBytes: number
   totalBytes: number
 }
+export type UpdateStatus = {
+  state: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error'
+  latest: { version: string; notesUrl: string } | null
+  // 0–1 while downloading.
+  progress: number | null
+  error: string | null
+  // Why this copy cannot replace itself; updates are then downloaded manually.
+  blocked: string | null
+}
+export type AboutInfo = {
+  version: string
+  electron: string
+  chrome: string
+  node: string
+  playwright: string
+  macos: string
+}
 export type AppSnapshot = {
   settings: SavedSettings
   catalog: DeviceProfile[]
   panes: PaneState[]
   engines: EngineSnapshot
   agent: AgentStatus
+  update: UpdateStatus
+  about: AboutInfo
 }
 export type FrameMessage = {
   type: 'frame'

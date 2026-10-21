@@ -8,7 +8,7 @@ Electron desktop application for macOS 15+ on Apple Silicon. The web value descr
 
 ## Stack
 
-Electron, Playwright, TypeScript, React, Tailwind CSS, and shadcn/ui. One pnpm package. Unsigned Apple Silicon builds are published as zip files on GitHub Releases; signing and notarization are out of scope.
+Electron, Playwright, TypeScript, React, Tailwind CSS, and shadcn/ui. One pnpm package. Unsigned Apple Silicon builds are published as zip files on GitHub Releases; signing and notarization are out of scope. The app updates itself from those releases after verifying an Ed25519 signature over the release checksums.
 
 ## Users
 
@@ -20,7 +20,7 @@ Keep multiple real Chromium, WebKit, and Firefox pages visible and interactive i
 
 ## Operating Context
 
-Localhost and remote HTTP/HTTPS websites, and local HTML files. Usually four to eight active previews. No hard pane-count limit, accounts, cloud infrastructure, or telemetry. Used directly or through coding agents (Claude Code, Codex, Cursor, VS Code, Gemini CLI, Zed) via a headless CLI and MCP server. Agents can also drive the open app through an opt-in, owner-only local socket.
+Localhost and remote HTTP/HTTPS websites, and local HTML files. Usually four to eight active previews. No hard pane-count limit, accounts, cloud infrastructure, or telemetry; the only app-initiated network request is a daily, optional, anonymous GitHub release check. Used directly or through coding agents (Claude Code, Codex, Cursor, VS Code, Gemini CLI, Zed) via a headless CLI and MCP server. Agents can also drive the open app through an opt-in, owner-only local socket.
 
 ## Capabilities and Constraints
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { AppEvent, AppSnapshot, PaneLabBridge, PaneState } from '../../src/shared/contracts'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 
 let store: typeof import('../../src/renderer/lib/store')
 let AddressBar: typeof import('../../src/renderer/features/address-bar').AddressBar
@@ -18,6 +18,8 @@ beforeEach(async () => {
     engines: engineSnapshot(),
     panes: [],
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
   }
   bridge = {
     bootstrap: vi.fn(async () => snapshot),

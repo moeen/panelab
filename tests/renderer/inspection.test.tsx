@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-react'
 import type { AppEvent, AppSnapshot, PaneLabBridge } from '../../src/shared/contracts'
 import type { Finding, Highlight, Target } from '../../src/shared/inspection'
 import { emptyFindings } from '../../src/shared/inspection'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 
 let receive: (event: AppEvent) => void
 let bridge: PaneLabBridge
@@ -22,6 +22,8 @@ beforeEach(async () => {
     engines: engineSnapshot(),
     panes: [],
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
   }
   bridge = {
     bootstrap: vi.fn(async () => snapshot),

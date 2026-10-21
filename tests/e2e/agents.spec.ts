@@ -25,7 +25,10 @@ test('agent access opens an owner-only socket that drives a separate Agent works
   await page.getByRole('button', { name: 'Workspace options' }).click()
   await page.getByRole('button', { name: 'Agents and MCP' }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('checkbox', { name: /Let agents use this window/ }).check()
+  // The checkbox reflects main's saved state, so wait for the round trip instead of using check().
+  const access = dialog.getByRole('checkbox', { name: /Let agents use this window/ })
+  await access.click()
+  await expect(access).toBeChecked()
   await expect(dialog.getByText('Waiting for agents')).toBeVisible()
   expect((await stat(socket)).mode & 0o777).toBe(0o600)
   await page.keyboard.press('Escape')

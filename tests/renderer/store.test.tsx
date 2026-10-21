@@ -2,7 +2,7 @@ import { act, StrictMode } from 'react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { AppEvent, AppSnapshot, PaneLabBridge, PaneState } from '../../src/shared/contracts'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 
 let store: typeof import('../../src/renderer/lib/store')
 let receive: (event: AppEvent) => void
@@ -16,6 +16,8 @@ beforeEach(async () => {
     catalog: [],
     engines: engineSnapshot(),
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
     panes: saved.workspaces.flatMap((workspace) =>
       workspace.panes.map(
         (pane): PaneState => ({

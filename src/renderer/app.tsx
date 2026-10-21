@@ -4,6 +4,8 @@ import {
   Camera,
   Check,
   ChevronDown,
+  CircleArrowUp,
+  Cog,
   Columns3,
   Laptop,
   Link2,
@@ -29,10 +31,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { downloadPercent } from '@/features/about-dialog'
 import { AddressBar } from '@/features/address-bar'
 import { ConfirmDialog } from '@/features/confirm-dialog'
-import { EngineSettings } from '@/features/engine-settings'
-import { ScreenshotFolder } from '@/features/screenshot-folder'
+import { EngineSetup } from '@/features/engine-settings'
 import { WorkspaceCanvas } from '@/features/workspace-canvas'
 import { WorkspaceLanguages } from '@/features/workspace-languages'
 import { inspection, startPicking, stopPicking, useInspection } from '@/lib/inspection'
@@ -41,26 +43,33 @@ import {
   holdNotice,
   initialize,
   maximizePane,
+  openOverlay,
+  openSettings,
   paneUrl,
   root,
   saveWorkspace,
   selectPane,
   send,
-  setAgentSettings,
-  setEngineSettings,
   setInspector,
   showNotice,
   useApp,
   workspace,
 } from '@/lib/store'
 import { canvasScale, nextPosition, widthAt } from '../shared/arrange'
-import type { DeviceProfile, PaneConfig, Workspace } from '../shared/contracts'
+import type { DeviceProfile, PaneConfig, UpdateStatus, Workspace } from '../shared/contracts'
 import { defaultMedia } from '../shared/emulation'
 import { type Engine, engineLabels, engines, requiresSynthetic } from '../shared/engines'
+import { matchShortcut } from '../shared/shortcuts'
 
 const Inspector = lazy(() => import('./features/inspector'))
-const AgentSettings = lazy(() =>
-  import('./features/agent-settings').then((module) => ({ default: module.AgentSettings })),
+const Settings = lazy(() =>
+  import('./features/settings').then((module) => ({ default: module.Settings })),
+)
+const AboutDialog = lazy(() =>
+  import('./features/about-dialog').then((module) => ({ default: module.AboutDialog })),
+)
+const ShortcutsDialog = lazy(() =>
+  import('./features/shortcuts-dialog').then((module) => ({ default: module.ShortcutsDialog })),
 )
 const DeviceEditor = lazy(() =>
   import('./features/device-editor').then((module) => ({ default: module.DeviceEditor })),
@@ -108,8 +117,7 @@ export function App() {
         ) : null}
       </main>
     )
-  if (!state.snapshot.settings.engineSetupComplete)
-    return <EngineSettings snapshot={state.snapshot} setup />
+  if (!state.snapshot.settings.engineSetupComplete) return <EngineSetup snapshot={state.snapshot} />
   return <WorkspaceApp state={state} current={current} />
 }
 
@@ -179,21 +187,17 @@ function WorkspaceApp({
       if (event instanceof CustomEvent && typeof event.detail === 'string') action(event.detail)
     }
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && inspection().picking) {
+      const match = matchShortcut(event)
+      if (match?.action === 'cancel') {
+        if (inspection().picking) stopPicking()
+        else if (root().maximized) maximizePane(null)
+        else return
         event.preventDefault()
-        stopPicking()
-        return
-      }
-      if (event.key === 'Escape' && root().maximized) {
+      } else if (match?.action === 'select-preview') {
+        const pane = workspace()?.panes[match.index]
+        if (!pane) return
         event.preventDefault()
-        maximizePane(null)
-      }
-      if (event.metaKey && /^[1-9]$/.test(event.key)) {
-        const pane = workspace()?.panes[Number(event.key) - 1]
-        if (pane) {
-          event.preventDefault()
-          selectPane(pane.id)
-        }
+        selectPane(pane.id)
       }
     }
     window.addEventListener('panelab:shortcut', shortcut)
@@ -238,7 +242,7 @@ function WorkspaceApp({
           : profile.defaultEngine
         : libraryEngine
     if (!available.includes(engine)) {
-      setEngineSettings(true)
+      openSettings('engines')
       showNotice(`Enable and download ${engineLabels[engine]} to add this preview.`)
       return
     }
@@ -378,13 +382,14 @@ function WorkspaceApp({
           <Plus />
         </Button>
         <div className="flex-1" />
+        <UpdateChip update={state.snapshot.update} />
         {state.snapshot.agent.access ? (
           <Button
             variant="ghost"
             size="sm"
             className="mr-1 h-7 gap-1.5 px-2 text-xs text-muted-foreground"
             title="Agent access is on. Open agent settings."
-            onClick={() => setAgentSettings(true)}
+            onClick={() => openSettings('agents')}
           >
             <span
               className={state.snapshot.agent.connections ? 'status-dot ready' : 'status-dot'}
@@ -415,7 +420,19 @@ function WorkspaceApp({
               className="w-full justify-start"
               onClick={() => {
                 setOptionsOpen(false)
-                setEngineSettings(true)
+                openSettings('general')
+              }}
+            >
+              <Cog />
+              Settings…
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => {
+                setOptionsOpen(false)
+                openSettings('engines')
               }}
             >
               <SlidersHorizontal />
@@ -427,7 +444,7 @@ function WorkspaceApp({
               className="w-full justify-start"
               onClick={() => {
                 setOptionsOpen(false)
-                setAgentSettings(true)
+                openSettings('agents')
               }}
             >
               <Bot />
@@ -470,48 +487,6 @@ function WorkspaceApp({
               Delete workspace…
             </Button>
             <WorkspaceLanguages key={current.id} languages={current.languages} />
-            <label className="field-label mt-4" htmlFor="appearance">
-              Appearance
-            </label>
-            <NativeSelect
-              id="appearance"
-              value={state.snapshot.settings.appearance}
-              onChange={(event) =>
-                void send({
-                  type: 'appearance.set',
-                  appearance:
-                    event.target.value === 'dark'
-                      ? 'dark'
-                      : event.target.value === 'light'
-                        ? 'light'
-                        : 'system',
-                })
-              }
-            >
-              <option value="system">Follow macOS</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </NativeSelect>
-            <label className="field-label mt-4" htmlFor="style-edits">
-              Style edits
-            </label>
-            <NativeSelect
-              id="style-edits"
-              value={state.snapshot.settings.styleEdits}
-              onChange={(event) =>
-                void send({
-                  type: 'style-edits.set',
-                  mode: event.target.value === 'rule' ? 'rule' : 'inline',
-                })
-              }
-            >
-              <option value="inline">Inline on the element</option>
-              <option value="rule">Rule in Live CSS</option>
-            </NativeSelect>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              How Elements applies a changed value in every preview.
-            </p>
-            <ScreenshotFolder folder={state.snapshot.settings.screenshotFolder} />
           </PopoverContent>
         </Popover>
       </header>
@@ -839,7 +814,7 @@ function WorkspaceApp({
                   variant="outline"
                   className="mt-5"
                   onClick={() =>
-                    available.length ? setEditor({ initial: null }) : setEngineSettings(true)
+                    available.length ? setEditor({ initial: null }) : openSettings('engines')
                   }
                 >
                   <Plus />
@@ -918,14 +893,13 @@ function WorkspaceApp({
           <DeviceEditor initial={editor.initial} onClose={() => setEditor(null)} />
         </Suspense>
       ) : null}
-      {state.engineSettingsOpen ? (
-        <EngineSettings snapshot={state.snapshot} onClose={() => setEngineSettings(false)} />
-      ) : null}
-      {state.agentSettingsOpen ? (
-        <Suspense fallback={null}>
-          <AgentSettings status={state.snapshot.agent} onClose={() => setAgentSettings(false)} />
-        </Suspense>
-      ) : null}
+      <Suspense fallback={null}>
+        {state.settings ? <Settings snapshot={state.snapshot} tab={state.settings} /> : null}
+        {state.overlay === 'about' ? (
+          <AboutDialog about={state.snapshot.about} update={state.snapshot.update} />
+        ) : null}
+        {state.overlay === 'shortcuts' ? <ShortcutsDialog /> : null}
+      </Suspense>
       {nameDialog ? (
         <NamingDialog
           data={nameDialog}
@@ -1158,5 +1132,32 @@ function WebsiteDialog({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Details and actions live in About so the titlebar never interrupts work.
+function UpdateChip({ update }: { update: UpdateStatus }) {
+  const version = update.latest?.version
+  const label =
+    update.state === 'available' || (update.state === 'checking' && version)
+      ? `Update ${version}`
+      : update.state === 'downloading'
+        ? `Downloading ${downloadPercent(update)}`
+        : update.state === 'ready'
+          ? 'Restart to update'
+          : null
+  if (!label) return null
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="mr-1 h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+      title={`PaneLab ${version}: ${label}. Open About PaneLab for details.`}
+      onClick={() => openOverlay('about')}
+    >
+      {update.state === 'ready' ? <span className="status-dot ready" aria-hidden="true" /> : null}
+      <CircleArrowUp />
+      <span className="tabular-nums">{label}</span>
+    </Button>
   )
 }

@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import type { AppCommand, AppSnapshot, Engine, EngineInstallation } from '../../shared/contracts'
 import { engineBusy, engineLabels } from '../../shared/engines'
 
@@ -13,50 +12,28 @@ const descriptions: Record<Engine, string> = {
   firefox: 'Firefox rendering. Mobile profiles require synthetic emulation.',
 }
 
-export function EngineSettings({
-  snapshot,
-  setup = false,
-  onClose,
-}: {
-  snapshot: AppSnapshot
-  setup?: boolean
-  onClose?: () => void
-}) {
-  const content = <EngineControls snapshot={snapshot} setup={setup} />
-  if (setup)
-    return (
-      <main className="flex h-full flex-col items-center overflow-y-auto bg-muted px-6 py-10">
-        <div className="my-auto w-full max-w-xl shrink-0 rounded-xl bg-background p-8 shadow-sm">
-          <BrandMark className="mb-5 size-9 text-primary" />
-          <h1 className="text-xl font-semibold">Choose your browser engines</h1>
-          <p className="mb-6 mt-2 text-sm leading-relaxed text-muted-foreground">
-            Download the engines you want to compare. You can change them later in settings.
-          </p>
-          {content}
-        </div>
-      </main>
-    )
+export function EngineSetup({ snapshot }: { snapshot: AppSnapshot }) {
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose?.()
-      }}
-    >
-      <DialogContent>
-        <div className="pr-8">
-          <DialogTitle className="text-lg font-semibold">Browser engines</DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-muted-foreground">
-            Choose engines to use. Disabling keeps downloads and pauses their previews.
-          </DialogDescription>
-        </div>
-        {content}
-      </DialogContent>
-    </Dialog>
+    <main className="flex h-full flex-col items-center overflow-y-auto bg-muted px-6 py-10">
+      <div className="my-auto w-full max-w-xl shrink-0 rounded-xl bg-background p-8 shadow-sm">
+        <BrandMark className="mb-5 size-9 text-primary" />
+        <h1 className="text-xl font-semibold">Choose your browser engines</h1>
+        <p className="mb-6 mt-2 text-sm leading-relaxed text-muted-foreground">
+          Download the engines you want to compare. You can change them later in settings.
+        </p>
+        <EngineControls snapshot={snapshot} setup />
+      </div>
+    </main>
   )
 }
 
-function EngineControls({ snapshot, setup }: { snapshot: AppSnapshot; setup: boolean }) {
+export function EngineControls({
+  snapshot,
+  setup = false,
+}: {
+  snapshot: AppSnapshot
+  setup?: boolean
+}) {
   const enabled = snapshot.settings.enabledEngines
   const [selected, setSelected] = useState<Engine[]>(() =>
     setup && !enabled.length ? ['chromium', 'webkit'] : enabled,

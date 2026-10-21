@@ -1,11 +1,13 @@
 import type { AgentStatus } from '../../src/shared/agent'
 import {
+  type AboutInfo,
   type DevicePreset,
   type EngineSnapshot,
   engines,
   makeWorkspace,
   type SavedSettings,
   type StorageSnapshot,
+  type UpdateStatus,
 } from '../../src/shared/contracts'
 import { defaultMedia } from '../../src/shared/emulation'
 import type { ElementDetail, Target } from '../../src/shared/inspection'
@@ -70,6 +72,30 @@ export function settings(): SavedSettings {
     styleEdits: 'inline',
     agentAccess: false,
     screenshotFolder: null,
+    autoUpdate: true,
+    updateCheckedAt: null,
+  }
+}
+
+export function updateStatus(patch: Partial<UpdateStatus> = {}): UpdateStatus {
+  return {
+    state: 'idle',
+    latest: null,
+    progress: null,
+    error: null,
+    blocked: null,
+    ...patch,
+  }
+}
+
+export function aboutInfo(): AboutInfo {
+  return {
+    version: '0.2.0',
+    electron: '44.9.0',
+    chrome: '146.0.0.0',
+    node: '24.0.0',
+    playwright: '1.64.1',
+    macos: '26.0',
   }
 }
 

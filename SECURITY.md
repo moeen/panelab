@@ -17,6 +17,8 @@ PaneLab runs websites in local browser processes and can be driven by coding age
 - MCP client config files PaneLab edits when you ask it to
 - Local files: the address bar, CLI, MCP server, and agent socket can open `file://` URLs, so an agent can render and read (`read_preview`) any file your account can read. Turn agent access off if that's not acceptable.
 - Page reading: `read_preview` validates everything the page returns and never returns password, one-time-code, or payment field values
+- The in-app updater: it trusts only release checksums signed with the PaneLab Ed25519 key, builds download URLs from a validated version number, checks the bundle identifier, version, and code signature, and passes paths to its install helper as arguments
+- External links open only fixed project URLs chosen in the main process
 - The screenshot folder is chosen only through a native dialog in the main process; renderer commands never carry a path
 
 Bugs in the websites you preview, or in Chromium, WebKit, or Firefox themselves, belong with those projects.

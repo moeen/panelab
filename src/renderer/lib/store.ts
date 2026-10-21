@@ -17,6 +17,7 @@ import type { BriefContext } from './agent-brief'
 import { receiveInspection, resetInspection } from './inspection'
 
 export type InspectorTab = 'console' | 'network' | 'elements' | 'findings' | 'css'
+export type SettingsTab = 'general' | 'engines' | 'agents'
 
 type RootState = {
   snapshot: AppSnapshot | null
@@ -25,8 +26,8 @@ type RootState = {
   inspector: InspectorTab | null
   notice: { message: string; error: boolean; reveal?: string } | null
   dialog: PageDialog | null
-  engineSettingsOpen: boolean
-  agentSettingsOpen: boolean
+  settings: SettingsTab | null
+  overlay: 'about' | 'shortcuts' | null
 }
 type DiagnosticState = {
   console: ConsoleEntry[]
@@ -41,8 +42,8 @@ let state: RootState = {
   inspector: null,
   notice: null,
   dialog: null,
-  engineSettingsOpen: false,
-  agentSettingsOpen: false,
+  settings: null,
+  overlay: null,
 }
 const subscribers = new Set<() => void>()
 const paneStates = new Map<string, PaneState>()
@@ -82,11 +83,11 @@ export function maximizePane(id: string | null): void {
 export function setInspector(inspector: RootState['inspector']): void {
   update({ inspector })
 }
-export function setEngineSettings(open: boolean): void {
-  update({ engineSettingsOpen: open })
+export function openSettings(tab: SettingsTab | null): void {
+  update({ settings: tab, ...(tab ? { overlay: null } : {}) })
 }
-export function setAgentSettings(open: boolean): void {
-  update({ agentSettingsOpen: open })
+export function openOverlay(overlay: RootState['overlay']): void {
+  update({ overlay, ...(overlay ? { settings: null } : {}) })
 }
 export function showNotice(message: string, error = true, reveal?: string): void {
   clearTimeout(noticeTimer)
@@ -145,6 +146,8 @@ function receive(event: AppEvent): void {
   } else if (event.type === 'notice') showNotice(event.message, event.error, event.reveal)
   else if (event.type === 'agent')
     update({ snapshot: state.snapshot ? { ...state.snapshot, agent: event.status } : null })
+  else if (event.type === 'update')
+    update({ snapshot: state.snapshot ? { ...state.snapshot, update: event.status } : null })
   else if (
     event.type === 'highlight' ||
     event.type === 'inspection' ||
@@ -168,8 +171,12 @@ function receive(event: AppEvent): void {
     else pickers.delete(event.paneId)
     for (const listener of paneSubscribers.get(event.paneId) ?? []) listener()
   } else if (event.type === 'shortcut') {
-    if (event.action === 'settings') setEngineSettings(true)
-    else window.dispatchEvent(new CustomEvent('panelab:shortcut', { detail: event.action }))
+    if (event.action === 'settings') openSettings('general')
+    else if (event.action === 'about' || event.action === 'shortcuts') openOverlay(event.action)
+    else if (event.action === 'check-updates') {
+      openOverlay('about')
+      void send({ type: 'update.check' })
+    } else window.dispatchEvent(new CustomEvent('panelab:shortcut', { detail: event.action }))
   } else {
     const previous = diagnostics(event.paneId)
     let next = previous

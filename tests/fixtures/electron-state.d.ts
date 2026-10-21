@@ -11,5 +11,7 @@ declare global {
     installs: string[]
     installationFailure: boolean
     downloadOutput: string
+    opened: string[]
+    updateRequests: string[]
   }
 }

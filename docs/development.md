@@ -59,7 +59,22 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow checks that the tag matches `package.json`, builds an unsigned arm64 `PaneLab-<version>-arm64.zip`, and publishes it with a `SHA256SUMS.txt` on GitHub Releases. Builds aren't signed or notarized, so users clear the quarantine flag once (see the README).
+The release workflow checks that the tag matches `package.json`, builds an unsigned arm64 `PaneLab-<version>-arm64.zip`, and publishes it with a `SHA256SUMS.txt` and its Ed25519 signature, `SHA256SUMS.txt.sig`, on GitHub Releases. Builds aren't signed or notarized, so users clear the quarantine flag once (see the README).
+
+### Update signing key
+
+The in-app updater (`src/main/updater.ts`) installs only releases whose checksums verify against the public key in `src/main/update-key.ts`. The release workflow signs with the `PANELAB_UPDATE_SIGNING_KEY` repository secret and fails without it.
+
+To create or rotate the key:
+
+```sh
+node scripts/update-keys.ts ~/.panelab/update-signing.key   # writes the private key, rewrites update-key.ts
+gh secret set PANELAB_UPDATE_SIGNING_KEY < ~/.panelab/update-signing.key
+```
+
+Commit the new `update-key.ts`. Copies built with an older key can't verify newer releases, so after a rotation those users update once by hand. Keep a backup of the private key outside the repository.
+
+`pnpm dev` first runs `scripts/dev-bundle.ts`, which renames the local development Electron.app to PaneLab (and gives it the PaneLab icon), so the macOS menu bar shows the right name. Packaged builds already carry it.
 
 ## Icons
 

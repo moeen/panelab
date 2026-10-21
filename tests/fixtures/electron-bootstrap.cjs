@@ -1,7 +1,7 @@
 const { mkdirSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
-const { app, clipboard, dialog, safeStorage, shell, utilityProcess } = require('electron')
+const { app, clipboard, dialog, net, safeStorage, shell, utilityProcess } = require('electron')
 const { encryption } = require('./encryption.cjs')
 const childProcess = require('node:child_process')
 const { syncBuiltinESMExports } = require('node:module')
@@ -24,6 +24,8 @@ globalThis.panelabTest = {
   installs: [],
   installationFailure: false,
   downloadOutput: '',
+  opened: [],
+  updateRequests: [],
 }
 clipboard.readText = async () => globalThis.panelabTest.clipboard
 clipboard.writeText = async (text) => {
@@ -37,6 +39,17 @@ dialog.showSaveDialog = async () => ({
   canceled: !globalThis.panelabTest.savePath,
   filePath: globalThis.panelabTest.savePath ?? '',
 })
+shell.openExternal = async (url) => {
+  globalThis.panelabTest.opened.push(url)
+}
+// Update checks never leave the machine; GitHub answers as if no release exists.
+const fetchUrl = net.fetch.bind(net)
+net.fetch = (input, init) => {
+  const url = String(input)
+  if (!/^https:\/\/(api\.)?github\.com\//.test(url)) return fetchUrl(input, init)
+  globalThis.panelabTest.updateRequests.push(url)
+  return Promise.resolve(new Response('', { status: 404 }))
+}
 shell.showItemInFolder = (path) => {
   globalThis.panelabTest.revealed.push(path)
 }

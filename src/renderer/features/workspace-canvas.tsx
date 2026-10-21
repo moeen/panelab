@@ -28,6 +28,7 @@ import {
   paneWidth,
 } from '../../shared/contracts'
 import type { Engine } from '../../shared/engines'
+import { matchShortcut } from '../../shared/shortcuts'
 import { PaneTile } from './pane-tile'
 
 type PaneData = {
@@ -203,11 +204,11 @@ function Canvas(props: CanvasProps) {
         (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
       )
         return
-      if (!event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return
-      if (event.code === 'Digit1') fitAll()
-      else if (event.code === 'Digit2' && selected)
+      const action = matchShortcut(event)?.action
+      if (action === 'fit-all') fitAll()
+      else if (action === 'zoom-selected' && selected)
         void flow.fitView({ nodes: [{ id: selected }], padding: fitPadding, duration: motion() })
-      else if (event.code === 'Digit0') void flow.zoomTo(1, { duration: motion() })
+      else if (action === 'zoom-actual') void flow.zoomTo(1, { duration: motion() })
       else return
       event.preventDefault()
     }

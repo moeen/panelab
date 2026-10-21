@@ -29,6 +29,7 @@ export default defineConfig({
             '@base-ui/react/dialog',
             '@base-ui/react/button',
             '@base-ui/react/checkbox',
+            '@base-ui/react/tabs',
             'lucide-react',
             'class-variance-authority',
             'clsx',

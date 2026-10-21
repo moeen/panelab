@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { AppSnapshot, PaneLabBridge } from '../../src/shared/contracts'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 
 let WorkspaceLanguages: typeof import('../../src/renderer/features/workspace-languages').WorkspaceLanguages
 let bridge: PaneLabBridge
@@ -14,6 +14,8 @@ beforeEach(async () => {
     engines: engineSnapshot(),
     panes: [],
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
   }
   bridge = {
     bootstrap: vi.fn(async () => snapshot),

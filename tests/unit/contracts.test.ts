@@ -166,3 +166,19 @@ describe('validated external input', () => {
     expect(deviceSchema.safeParse({}).success).toBe(false)
   })
 })
+
+describe('update and link commands', () => {
+  test('accept only fixed link targets and boolean auto-update choices', () => {
+    expect(commandSchema.safeParse({ type: 'open.link', target: 'issues' }).success).toBe(true)
+    for (const value of [
+      { type: 'open.link', target: 'https://example.com' },
+      { type: 'open.link', url: 'https://example.com' },
+      { type: 'update.auto.set', enabled: 'yes' },
+    ])
+      expect(commandSchema.safeParse(value).success).toBe(false)
+  })
+  test('older settings files gain update defaults', () => {
+    const { autoUpdate: _auto, updateCheckedAt: _checked, ...legacy } = settings()
+    expect(settingsSchema.parse(legacy)).toMatchObject({ autoUpdate: true, updateCheckedAt: null })
+  })
+})

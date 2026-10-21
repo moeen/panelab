@@ -1,7 +1,10 @@
+import { execFile, spawn } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, stat } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
 import {
   app,
   BrowserWindow,
@@ -27,6 +30,7 @@ import {
   commandSchema,
   type DeviceProfile,
   isPageUrl,
+  type LinkTarget,
   normalizeUrl,
   type PaneState,
   type RuntimeCommand,
@@ -34,12 +38,15 @@ import {
   type RuntimeReply,
   type StorageSnapshot,
 } from '../shared/contracts'
+import { accelerator, type ShortcutAction } from '../shared/shortcuts'
 import { AgentService } from './agent'
 import { ownedDirectory } from './cache'
 import type { EngineManager } from './engines'
 import { rendererAsset } from './protocol'
 import { SettingsService } from './settings'
 import { WorkspaceStore } from './store'
+import { updatePublicKey } from './update-key'
+import { repository, Updater } from './updater'
 
 const directory = fileURLToPath(new URL('.', import.meta.url))
 protocol.registerSchemesAsPrivileged([
@@ -53,6 +60,7 @@ let config: SettingsService
 let store: WorkspaceStore
 let engineManager: EngineManager
 let agent: AgentService | null = null
+let updater: Updater
 let quitting = false
 let sequence = 0
 let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -87,7 +95,30 @@ function snapshot(): AppSnapshot {
     panes: [...panes.values()],
     engines: engineManager.snapshot(),
     agent: agentService().status(),
+    update: updater.status(),
+    about: {
+      version: app.getVersion(),
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+      playwright: playwrightVersion(),
+      macos: process.getSystemVersion(),
+    },
   }
+}
+function playwrightVersion(): string {
+  try {
+    const version: unknown = createRequire(import.meta.url)('playwright/package.json').version
+    return typeof version === 'string' ? version : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+const links: Record<LinkTarget, string> = {
+  releases: `${repository}/releases`,
+  repo: repository,
+  issues: `${repository}/issues/new/choose`,
+  license: `${repository}/blob/main/LICENSE`,
 }
 function agentService(): AgentService {
   if (!agent) throw new Error('Agent service is not ready.')
@@ -227,9 +258,18 @@ async function execute(command: AppCommand): Promise<ActionResult> {
     command.type.startsWith('preset.') ||
     command.type.startsWith('engines.') ||
     command.type === 'appearance.set' ||
-    command.type === 'style-edits.set'
+    command.type === 'style-edits.set' ||
+    command.type === 'update.auto.set'
   )
     return config.configure(command)
+  if (command.type.startsWith('update.')) return updater.command(command)
+  if (command.type === 'open.link') {
+    const latest = updater.status().latest
+    await shell.openExternal(
+      command.target === 'releases' && latest ? latest.notesUrl : links[command.target],
+    )
+    return { ok: true }
+  }
   if (!worker) await reconcile()
   if (command.type === 'capture') return capture(command.paneIds, command.fullPage)
   if (command.type === 'screenshots.folder') return screenshotFolder(command.action)
@@ -387,15 +427,20 @@ function verifySender(event: Electron.IpcMainInvokeEvent): void {
     throw new Error('Untrusted application sender.')
 }
 function createMenu(): void {
-  const shortcut = (action: Extract<AppEvent, { type: 'shortcut' }>['action']) => () =>
-    emit({ type: 'shortcut', action })
+  const shortcut = (action: ShortcutAction) => () => emit({ type: 'shortcut', action })
+  const item = (label: string, action: ShortcutAction) => {
+    const key = accelerator(action)
+    return { label, click: shortcut(action), ...(key ? { accelerator: key } : {}) }
+  }
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
         label: 'PaneLab',
         submenu: [
-          { role: 'about' },
-          { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: shortcut('settings') },
+          item('About PaneLab', 'about'),
+          item('Check for Updates…', 'check-updates'),
+          { type: 'separator' },
+          item('Settings…', 'settings'),
           { type: 'separator' },
           { role: 'hide' },
           { role: 'hideOthers' },
@@ -407,11 +452,7 @@ function createMenu(): void {
       {
         label: 'File',
         submenu: [
-          {
-            label: 'Save selected screenshot…',
-            accelerator: 'CmdOrCtrl+Shift+S',
-            click: shortcut('capture'),
-          },
+          item('Save selected screenshot…', 'capture'),
           { type: 'separator' },
           { role: 'close' },
         ],
@@ -431,35 +472,32 @@ function createMenu(): void {
       {
         label: 'View',
         submenu: [
-          { label: 'Focus address bar', accelerator: 'CmdOrCtrl+L', click: shortcut('address') },
-          { label: 'Reload previews', accelerator: 'CmdOrCtrl+R', click: shortcut('reload') },
-          { label: 'Back', accelerator: 'CmdOrCtrl+[', click: shortcut('back') },
-          { label: 'Forward', accelerator: 'CmdOrCtrl+]', click: shortcut('forward') },
-          {
-            label: 'Select element',
-            accelerator: 'CmdOrCtrl+Shift+C',
-            click: shortcut('inspect'),
-          },
-          {
-            label: 'Select next preview',
-            accelerator: 'CmdOrCtrl+Shift+]',
-            click: shortcut('select-next'),
-          },
+          item('Focus address bar', 'address'),
+          item('Reload previews', 'reload'),
+          item('Back', 'back'),
+          item('Forward', 'forward'),
+          item('Select element', 'inspect'),
+          item('Select next preview', 'select-next'),
           { type: 'separator' },
-          { label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: shortcut('zoom-in') },
-          { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: shortcut('zoom-out') },
-          { label: 'Actual size', accelerator: 'CmdOrCtrl+0', click: shortcut('zoom-reset') },
-          {
-            label: 'Rotate phones and tablets',
-            accelerator: 'CmdOrCtrl+Alt+R',
-            click: shortcut('rotate-all'),
-          },
+          item('Zoom in', 'zoom-in'),
+          item('Zoom out', 'zoom-out'),
+          item('Actual size', 'zoom-reset'),
+          item('Rotate phones and tablets', 'rotate-all'),
           { type: 'separator' },
           { role: 'togglefullscreen' },
           { role: 'toggleDevTools' },
         ],
       },
       { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'front' }] },
+      {
+        role: 'help',
+        submenu: [
+          item('Keyboard Shortcuts', 'shortcuts'),
+          { type: 'separator' },
+          { label: 'Release Notes', click: () => void shell.openExternal(links.releases) },
+          { label: 'Report an Issue', click: () => void shell.openExternal(links.issues) },
+        ],
+      },
     ]),
   )
 }
@@ -520,11 +558,6 @@ void app
     } else {
       app.setName('PaneLab')
       app.dock?.setIcon(appIcon)
-      app.setAboutPanelOptions({
-        applicationName: 'PaneLab',
-        applicationVersion: app.getVersion(),
-        iconPath: appIcon,
-      })
       const dataDirectory = process.env.PANELAB_DATA_DIR ?? app.getPath('userData')
       store = new WorkspaceStore(dataDirectory)
       const loaded = await store.load()
@@ -550,6 +583,24 @@ void app
           publish()
         },
       })
+      const bundle = resolve(process.execPath, '../../..')
+      updater = new Updater({
+        version: app.getVersion(),
+        bundle: app.isPackaged && bundle.endsWith('.app') ? bundle : null,
+        directory: await ownedDirectory(join(dataDirectory, 'updates')),
+        publicKey: updatePublicKey,
+        fetch: (url, init) => net.fetch(url, init),
+        run: async (file, args) => (await promisify(execFile)(file, args)).stdout,
+        launch: (file, args) => spawn(file, args, { detached: true, stdio: 'ignore' }).unref(),
+        changed: (status) => emit({ type: 'update', status }),
+        policy: () => ({
+          enabled: config.settings.autoUpdate,
+          checkedAt: config.settings.updateCheckedAt,
+        }),
+        checked: (time) => config.setUpdateCheckedAt(time),
+        quit: () => app.quit(),
+      })
+      const installed = await updater.recover()
       await engineManager.refresh()
       nativeTheme.themeSource = config.settings.appearance
       createMenu()
@@ -610,6 +661,14 @@ void app
       await createWindow()
       if (settings.engineSetupComplete) await reconcile()
       if (loaded.warning) notice(loaded.warning)
+      if (installed)
+        notice(
+          installed.ok
+            ? `PaneLab updated to ${installed.version ?? app.getVersion()}.`
+            : (installed.error ?? 'The update was not installed.'),
+          !installed.ok,
+        )
+      updater.start()
       await agentService().refresh()
       await agentService()
         .sync()
@@ -637,6 +696,7 @@ void app
         event.preventDefault()
         quitting = true
         engineManager.stop()
+        updater.stop()
         clearTimeout(saveTimer)
         clearInterval(sessionTimer)
         const deadline = setTimeout(() => {
@@ -649,6 +709,8 @@ void app
             await config.persist()
             await rememberSession()
             if (worker) await request({ type: 'shutdown' })
+            // A downloaded update installs on an ordinary quit, without relaunching.
+            if (updater.status().state === 'ready') await updater.install(false)
           } catch (error) {
             process.stderr.write(`${errorMessage(error)}\n`)
           } finally {

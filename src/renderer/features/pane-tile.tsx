@@ -23,11 +23,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useInspection } from '@/lib/inspection'
 import {
   maximizePane,
+  openSettings,
   paneUrl,
   saveWorkspace,
   selectPane,
   send,
-  setEngineSettings,
   setInspector,
   usePane,
   useSyncStatus,
@@ -348,7 +348,7 @@ export const PaneTile = memo(function PaneTile({
               className="mt-4"
               onClick={() =>
                 pane.status === 'paused'
-                  ? setEngineSettings(true)
+                  ? openSettings('engines')
                   : void send({ type: 'reload', paneIds: [config.id] })
               }
             >

@@ -1,9 +1,9 @@
 import { act, type Dispatch, type SetStateAction, useState } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { EngineSettings } from '../../src/renderer/features/engine-settings'
+import { EngineControls, EngineSetup } from '../../src/renderer/features/engine-settings'
 import type { AppSnapshot } from '../../src/shared/contracts'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 import '../../src/renderer/styles.css'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -13,6 +13,8 @@ function snapshot(): AppSnapshot {
     catalog: [],
     panes: [],
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
     engines: {
       ...engineSnapshot(),
       engines: engineSnapshot().engines.map((state) => ({ ...state, status: 'missing' })),
@@ -23,7 +25,7 @@ function snapshot(): AppSnapshot {
 test('setup suggests Chromium and WebKit but downloads only after confirmation', async () => {
   const send = vi.fn(async () => ({ ok: true }))
   vi.stubGlobal('panelab', { send })
-  const screen = await render(<EngineSettings snapshot={snapshot()} setup />)
+  const screen = await render(<EngineSetup snapshot={snapshot()} />)
   await expect.element(screen.getByRole('checkbox', { name: /^Chromium/ })).toBeChecked()
   await expect.element(screen.getByRole('checkbox', { name: /^WebKit/ })).toBeChecked()
   await expect.element(screen.getByRole('checkbox', { name: /^Firefox/ })).not.toBeChecked()
@@ -43,7 +45,7 @@ test('setup waits for a ready selected engine and exposes retry after failures',
   const Harness = () => {
     const [value, setValue] = useState(initial)
     change = setValue
-    return <EngineSettings snapshot={value} setup />
+    return <EngineSetup snapshot={value} />
   }
   const screen = await render(<Harness />)
   await expect.element(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
@@ -80,7 +82,7 @@ test('settings show disk use and clear only disabled downloads', async () => {
     totalBytes: 31 * 1024 ** 2,
     engines: engineSnapshot().engines.map((state) => ({ ...state, bytes: 10 * 1024 ** 2 })),
   }
-  const screen = await render(<EngineSettings snapshot={value} />)
+  const screen = await render(<EngineControls snapshot={value} />)
   await expect.element(screen.getByText('31.0 MiB', { exact: true })).toBeVisible()
   await expect
     .element(screen.getByRole('button', { name: 'Remove WebKit downloads' }))
@@ -104,7 +106,7 @@ test('settings broadcasts keep unapplied engine choices until the saved selectio
   const Harness = () => {
     const [value, setValue] = useState(initial)
     change = setValue
-    return <EngineSettings snapshot={value} />
+    return <EngineControls snapshot={value} />
   }
   const screen = await render(<Harness />)
   await screen.getByRole('checkbox', { name: /^Firefox/ }).click()

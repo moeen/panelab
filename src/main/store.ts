@@ -31,6 +31,8 @@ export class WorkspaceStore {
         styleEdits: 'inline' as const,
         agentAccess: false,
         screenshotFolder: null,
+        autoUpdate: true,
+        updateCheckedAt: null,
       }
     }
     try {

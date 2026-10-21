@@ -381,7 +381,8 @@ test('a saved screenshot folder skips save dialogs, reveals captures, and falls 
     globalThis.panelabTest.savePath = null
   }, folder)
   await page.getByRole('button', { name: 'Workspace options' }).click()
-  await page.getByRole('button', { name: 'Choose folder…' }).click()
+  await page.getByRole('button', { name: 'Settings…' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Choose folder…' }).click()
   await expect.poll(async () => (await snapshot(page)).settings.screenshotFolder).toBe(folder)
   await expect(page.getByTitle(folder)).toHaveText('shots')
   await page.keyboard.press('Escape')

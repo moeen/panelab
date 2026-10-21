@@ -10,6 +10,8 @@ test('rejects malformed and privileged renderer commands', async ({ application 
     { type: 'file.choose', paneId: 'p', files: ['/tmp/forbidden.txt'] },
     { type: 'clipboard.text', paneId: 'p', action: 'paste', text: 'forbidden' },
     { type: 'input', paneId: 'p', input: { kind: 'move', x: 'invalid', y: 0 } },
+    { type: 'open.link', target: 'https://example.com' },
+    { type: 'update.install' },
   ]) {
     const result: unknown = await application.page.evaluate(
       (value) => Reflect.apply(window.panelab.send, window.panelab, [value]),

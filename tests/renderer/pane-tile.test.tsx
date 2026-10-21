@@ -8,7 +8,7 @@ import type {
   PaneLabBridge,
   PaneState,
 } from '../../src/shared/contracts'
-import { agentStatus, engineSnapshot, settings } from '../fixtures/data'
+import { aboutInfo, agentStatus, engineSnapshot, settings, updateStatus } from '../fixtures/data'
 import '../../src/renderer/styles.css'
 
 let PaneTile: typeof import('../../src/renderer/features/pane-tile').PaneTile
@@ -49,6 +49,8 @@ beforeEach(async () => {
     engines: engineSnapshot(),
     panes: [],
     agent: agentStatus(),
+    update: updateStatus(),
+    about: aboutInfo(),
   }
   bridge = {
     bootstrap: vi.fn(async () => snapshot),

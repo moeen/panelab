@@ -39,3 +39,22 @@ export function DialogContent({
     </DialogPrimitive.Portal>
   )
 }
+// For dialogs whose visibility lives in app state: mounted means open, dismissal reports out.
+export function ClosableDialog({
+  onClose,
+  children,
+}: {
+  onClose: () => void
+  children: ReactNode
+}) {
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      {children}
+    </Dialog>
+  )
+}

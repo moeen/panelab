@@ -81,6 +81,9 @@ export class SettingsService {
   setScreenshotFolder(path: string | null): Promise<void> {
     return this.serialize(() => this.commitField('screenshotFolder', path))
   }
+  setUpdateCheckedAt(time: number): Promise<void> {
+    return this.serialize(() => this.commitField('updateCheckedAt', time))
+  }
   private async commit(): Promise<ActionResult> {
     await this.persist()
     this.host.changed(this.settings)
@@ -210,6 +213,9 @@ export class SettingsService {
         return { ok: true }
       case 'agent.access.set':
         await this.commitField('agentAccess', command.enabled)
+        return { ok: true }
+      case 'update.auto.set':
+        await this.commitField('autoUpdate', command.enabled)
         return { ok: true }
       case 'engines.set': {
         if (!settings.engineSetupComplete && !command.enabled.length)

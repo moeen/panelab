@@ -38,6 +38,8 @@ PaneLab is a macOS app for responsive web work. Point it at `localhost:3000` and
    xattr -dr com.apple.quarantine /Applications/PaneLab.app
    ```
 
+After that, PaneLab updates itself from GitHub Releases and verifies each update's signature before installing it. Versions before 0.3.0 need one manual update.
+
 ### From source
 
 You need Node.js 24 and pnpm 12.
@@ -60,7 +62,7 @@ The [usage guide](docs/usage.md) covers the canvas, sync, inspector, sessions, s
 
 ## Use it from an agent
 
-Open **Workspace options → Agents and MCP** to install the `panelab` command and add PaneLab to your MCP clients. Then:
+Open **Settings → Agents and MCP** to install the `panelab` command and add PaneLab to your MCP clients. Then:
 
 ```sh
 panelab scan localhost:3000 -d iphone-16 -d macbook-air-13 -e webkit,chromium
