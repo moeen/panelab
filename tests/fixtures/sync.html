@@ -46,6 +46,11 @@
         <div role="option" tabindex="-1">Red</div><div role="option" tabindex="-1">Green</div><div role="option" tabindex="-1">Blue</div>
       </div>
     </section>
+    <section>
+      <a href="#top">Top</a> <span class="grab" style="cursor: url(missing.png) 2 2, grab">Grab</span>
+      <p class="prose">Plain words to select</p>
+      <iframe class="frame" title="Cursor frame" tabindex="-1" src="/frame" style="width:200px;height:100px"></iframe>
+    </section>
     <script>
       const parameters = new URLSearchParams(location.search)
       if (parameters.has('pane')) sessionStorage.setItem('pane', parameters.get('pane'))
@@ -79,7 +84,8 @@
           boxes: Object.fromEntries(
             [['todo', todo], ['notes', '[aria-label="Notes"]'], ['query', '[name="q"]'], ['search', '[aria-label="Search docs"]'],
              ['first', '[aria-label="First name"]'], ['a', '.box:nth-of-type(1)'], ['b', '.box:nth-of-type(2)'],
-             ['size', '[aria-label="Size"]'], ['colors', '[role="listbox"]']]
+             ['size', '[aria-label="Size"]'], ['colors', '[role="listbox"]'], ['link', 'a[href="#top"]'],
+             ['grab', '.grab'], ['prose', '.prose'], ['frame', '.frame']]
               .map(([name, target]) => [name, box(typeof target === 'string' ? document.querySelector(target) : target)])),
         }) })
       todo.addEventListener('keydown', (event) => {

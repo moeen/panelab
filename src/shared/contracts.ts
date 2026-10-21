@@ -296,6 +296,45 @@ export type NetworkEntry = {
   postData: string | null
   failure: string | null
 }
+// CSS cursor keywords a website can request; `auto` is resolved by the page agent.
+export const pageCursorSchema = z.enum([
+  'default',
+  'none',
+  'context-menu',
+  'help',
+  'pointer',
+  'progress',
+  'wait',
+  'cell',
+  'crosshair',
+  'text',
+  'vertical-text',
+  'alias',
+  'copy',
+  'move',
+  'no-drop',
+  'not-allowed',
+  'grab',
+  'grabbing',
+  'all-scroll',
+  'col-resize',
+  'row-resize',
+  'n-resize',
+  'e-resize',
+  's-resize',
+  'w-resize',
+  'ne-resize',
+  'nw-resize',
+  'se-resize',
+  'sw-resize',
+  'ew-resize',
+  'ns-resize',
+  'nesw-resize',
+  'nwse-resize',
+  'zoom-in',
+  'zoom-out',
+])
+export type PageCursor = z.infer<typeof pageCursorSchema>
 export type PageDialog = {
   id: string
   paneId: string
@@ -312,6 +351,7 @@ export type AppEvent =
   | { type: 'body'; paneId: string; requestId: string; text: string; omitted: boolean }
   | { type: 'clear'; paneId: string }
   | { type: 'sync'; paneId: string; message: string | null }
+  | { type: 'cursor'; paneId: string; cursor: PageCursor }
   // A null dialog with an id closes that dialog; without one it closes every dialog of the pane.
   | { type: 'dialog'; dialog: PageDialog | null; paneId: string; dialogId?: string }
   // Null closes the pane's picker.

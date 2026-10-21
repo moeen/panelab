@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { subscribeFrames } from '@/lib/frames'
 import { hoverAt, selectAt, useInspection } from '@/lib/inspection'
 import { toPlaywrightKey } from '@/lib/keys'
-import { send } from '@/lib/store'
+import { send, subscribeCursor } from '@/lib/store'
 import type { PreviewInput } from '../../shared/contracts'
 import { HighlightOverlay } from './highlight-overlay'
 import { SelectPicker } from './select-picker'
@@ -109,7 +109,14 @@ export function PreviewCanvas({
         })
       return drawing
     }
-    const unsubscribe = subscribeFrames(paneId, draw)
+    const unsubscribeFrames = subscribeFrames(paneId, draw)
+    const unsubscribeCursor = subscribeCursor(paneId, (cursor) =>
+      canvas.current?.style.setProperty('--site-cursor', cursor),
+    )
+    const unsubscribe = () => {
+      unsubscribeFrames()
+      unsubscribeCursor()
+    }
     const container = stage.current
     if (!container) return unsubscribe
     let visible = true
@@ -201,7 +208,7 @@ export function PreviewCanvas({
       <canvas
         ref={canvas}
         onContextMenu={(event) => event.preventDefault()}
-        className={`preview-canvas ${enabled ? '' : 'invisible'} ${picking ? 'picking' : ''}`}
+        className={`preview-canvas ${enabled ? '' : 'invisible'} ${touch ? 'touch' : ''} ${picking ? 'picking' : ''}`}
         style={{ width: '100%', height: '100%' }}
         tabIndex={enabled ? 0 : -1}
         aria-label={`Interactive preview: ${label}. Click to focus website input.`}

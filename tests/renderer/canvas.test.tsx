@@ -2,15 +2,20 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { Profiler, StrictMode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import type { AppCommand } from '../../src/shared/contracts'
+import type { AppCommand, PageCursor } from '../../src/shared/contracts'
 
 const bridge = vi.hoisted(() => ({
   send: vi.fn<(command: AppCommand, quiet?: boolean) => Promise<boolean>>(async () => true),
+  cursors: new Map<string, (cursor: PageCursor) => void>(),
 }))
 vi.mock('../../src/renderer/lib/store', () => ({
   send: bridge.send,
   setInspector: vi.fn(),
   usePicker: () => null,
+  subscribeCursor: (id: string, listener: (cursor: PageCursor) => void) => {
+    bridge.cursors.set(id, listener)
+    return () => bridge.cursors.delete(id)
+  },
 }))
 
 import { PreviewCanvas } from '../../src/renderer/features/preview-canvas'
@@ -344,4 +349,33 @@ test('wheel deltas accumulate while a scroll is in flight instead of queueing', 
     bridge.send.mockImplementation(async () => true)
     await screen.unmount()
   }
+})
+
+test('applies the website cursor without React commits and releases it on unmount', async () => {
+  let commits = 0
+  const screen = await render(
+    <Profiler
+      id="canvas"
+      onRender={() => {
+        commits++
+      }}
+    >
+      <PreviewCanvas
+        paneId="cursor-pane"
+        label="Cursor"
+        touch={false}
+        sourceWidth={1600}
+        enabled
+        onActivate={() => {}}
+      />
+    </Profiler>,
+    { wrapper: ReactFlowProvider },
+  )
+  const canvas = screen.getByLabelText('Interactive preview: Cursor. Click to focus website input.')
+  const before = commits
+  bridge.cursors.get('cursor-pane')?.('pointer')
+  expect(canvas.element().style.getPropertyValue('--site-cursor')).toBe('pointer')
+  expect(commits).toBe(before)
+  await screen.unmount()
+  expect(bridge.cursors.has('cursor-pane')).toBe(false)
 })

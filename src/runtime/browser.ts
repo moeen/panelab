@@ -22,6 +22,7 @@ import {
   normalizeUrl,
   type PaneConfig,
   type PaneState,
+  pageCursorSchema,
   type RuntimeCommand,
   type RuntimeMessage,
   type RuntimeReply,
@@ -81,7 +82,13 @@ type Entry = {
 }
 
 const removedMessage = 'This preview was removed.'
-const pageMessageSchema = z.union([syncActionSchema, highlightMessageSchema, pickerMessageSchema])
+const cursorMessageSchema = z.object({ kind: z.literal('cursor'), cursor: pageCursorSchema })
+const pageMessageSchema = z.union([
+  syncActionSchema,
+  highlightMessageSchema,
+  pickerMessageSchema,
+  cursorMessageSchema,
+])
 
 export class BrowserRuntime {
   private availableEngines = new Set<Engine>()
@@ -269,7 +276,9 @@ export class BrowserRuntime {
         if (message.data.kind === 'highlight') {
           if (source.frame === source.page.mainFrame())
             this.inspection.pageMessage(entry.config.id, message.data)
-        } else if (message.data.kind === 'picker') {
+        } else if (message.data.kind === 'cursor')
+          this.emit({ type: 'cursor', paneId: entry.config.id, cursor: message.data.cursor })
+        else if (message.data.kind === 'picker') {
           // Only the user's own input opens a picker; replayed clicks never do.
           if (source.frame === source.page.mainFrame() && entry.echo.broadcasting()) {
             entry.picker = message.data.picker.id

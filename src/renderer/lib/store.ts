@@ -6,6 +6,7 @@ import type {
   AppSnapshot,
   ConsoleEntry,
   NetworkEntry,
+  PageCursor,
   PageDialog,
   PaneState,
   Workspace,
@@ -52,6 +53,8 @@ const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const emptyDiagnostics: DiagnosticState = { console: [], network: [], bodies: {}, sync: null }
 const pageDialogs = new Map<string, PageDialog>()
 const pickers = new Map<string, PagePicker>()
+const cursorListeners = new Map<string, (cursor: PageCursor) => void>()
+const cursors = new Map<string, PageCursor>()
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | null = null
 let initialization: Promise<void> | null = null
@@ -121,6 +124,7 @@ function receive(event: AppEvent): void {
       if (!ids.has(id)) {
         paneStates.delete(id)
         diagnosticStates.delete(id)
+        cursors.delete(id)
       }
     update({
       snapshot: state.snapshot ? { ...state.snapshot, settings: event.settings } : null,
@@ -156,6 +160,9 @@ function receive(event: AppEvent): void {
       for (const [id, dialog] of pageDialogs)
         if (dialog.paneId === event.paneId) pageDialogs.delete(id)
     update({ dialog: pageDialogs.values().next().value ?? null })
+  } else if (event.type === 'cursor') {
+    cursors.set(event.paneId, event.cursor)
+    cursorListeners.get(event.paneId)?.(event.cursor)
   } else if (event.type === 'picker') {
     if (event.picker) pickers.set(event.paneId, event.picker)
     else pickers.delete(event.paneId)
@@ -253,6 +260,16 @@ export function usePane(id: string | null): PaneState | null {
     (listener) => (id ? subscribePane(id, listener) : () => {}),
     () => (id ? (paneStates.get(id) ?? null) : null),
   )
+}
+// The website cursor stays outside React state; the canvas applies it directly.
+export function subscribeCursor(id: string, listener: (cursor: PageCursor) => void): () => void {
+  cursorListeners.set(id, listener)
+  // A remounted canvas starts blank while the page only reports changes.
+  const cursor = cursors.get(id)
+  if (cursor) listener(cursor)
+  return () => {
+    if (cursorListeners.get(id) === listener) cursorListeners.delete(id)
+  }
 }
 // The select picker a pane's website opened; PaneLab draws it because headless engines can't.
 export function usePicker(id: string): PagePicker | null {

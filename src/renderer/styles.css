@@ -178,6 +178,7 @@
   }
   .preview-canvas {
     @apply block touch-none outline-none;
+    cursor: var(--site-cursor, default);
   }
   .preview-input {
     @apply absolute left-1 top-1 h-px w-px resize-none border-0 p-0 opacity-0 outline-none;
@@ -290,6 +291,13 @@
   }
   .inspect-status {
     @apply absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-background px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm;
+  }
+  /* Touch devices have no pointer; like Chrome's device mode, show the touch point. */
+  .preview-canvas.touch {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23000' fill-opacity='.25' stroke='%23fff' stroke-opacity='.7' stroke-width='1.5'/%3E%3C/svg%3E")
+      12 12,
+      default;
   }
   .preview-canvas.picking {
     cursor: crosshair;

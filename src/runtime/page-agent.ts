@@ -362,6 +362,75 @@ export function installPageAgent(options: PageAgentOptions): void {
     { capture: true, passive: true },
   )
 
+  // The canvas shows the cursor the website asks for. `url()` cursors fall back to their keyword,
+  // and `auto` follows browsers: an I-beam over editable fields and selectable text.
+  const overText = (x: number, y: number) => {
+    let node: Node | null = null
+    let offset = 0
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const caret = document.caretPositionFromPoint(x, y)
+      node = caret?.offsetNode ?? null
+      offset = caret?.offset ?? 0
+    } else if (typeof document.caretRangeFromPoint === 'function') {
+      const caret = document.caretRangeFromPoint(x, y)
+      node = caret?.startContainer ?? null
+      offset = caret?.startOffset ?? 0
+    }
+    if (!(node instanceof Text) || !node.data.trim() || !node.parentElement) return false
+    const style = getComputedStyle(node.parentElement)
+    const select =
+      style.getPropertyValue('user-select') || style.getPropertyValue('-webkit-user-select')
+    if (select === 'none') return false
+    const range = document.createRange()
+    for (const start of [offset - 1, offset]) {
+      if (start < 0 || start >= node.data.length) continue
+      range.setStart(node, start)
+      range.setEnd(node, start + 1)
+      for (const rect of range.getClientRects())
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true
+    }
+    return false
+  }
+  const autoCursor = (element: Element, x: number, y: number) => {
+    if (editsText(element)) return 'text'
+    // WebKit leaves links at `auto` and draws the hand natively.
+    if (element.closest('a[href],area[href]')) return 'pointer'
+    if (element.closest('button,select,summary,[draggable="true"]')) return 'default'
+    // Text under the pointer is a direct child of the target; skipping the hit test keeps moves cheap.
+    for (const node of element.childNodes)
+      if (node instanceof Text && node.data.trim()) return overText(x, y) ? 'text' : 'default'
+    return 'default'
+  }
+  let cursor = ''
+  if (!options.touch) {
+    // Every frame posts its own cursor, so a document the pointer re-enters must post again.
+    document.addEventListener(
+      'mouseover',
+      (event) => {
+        const from = event.relatedTarget
+        if (!from || (from instanceof Element && from.matches('iframe,frame,object,embed')))
+          cursor = ''
+      },
+      { capture: true, passive: true },
+    )
+    document.addEventListener(
+      'mousemove',
+      (event) => {
+        const element = eventElement(event)
+        if (!element) return
+        const value = (getComputedStyle(element).cursor.split(',').pop()?.trim() ?? 'auto').replace(
+          /^-(webkit|moz)-/,
+          '',
+        )
+        const next = value === 'auto' ? autoCursor(element, event.clientX, event.clientY) : value
+        if (next === cursor) return
+        cursor = next
+        post({ kind: 'cursor', cursor: next })
+      },
+      { capture: true, passive: true },
+    )
+  }
+
   // Inspection: node references stay valid for this document only.
   const documentId = Math.random().toString(36).slice(2, 12) || 'document'
   let counter = 0

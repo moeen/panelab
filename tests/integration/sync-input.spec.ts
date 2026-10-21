@@ -52,6 +52,12 @@ const pickers = (messages: RuntimeMessage[], paneId: string): (PagePicker | null
       ? [message.event.picker]
       : [],
   )
+const cursors = (messages: RuntimeMessage[], paneId: string): string[] =>
+  messages.flatMap((message) =>
+    message.type === 'event' && message.event.type === 'cursor' && message.event.paneId === paneId
+      ? [message.event.cursor]
+      : [],
+  )
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 test('typing then Enter adds a todo exactly once in every pane', async ({ runtime, site }) => {
@@ -224,4 +230,35 @@ test('command keys replay outside text fields, and Tab never does', async ({ run
   await settle(1000)
   expect(report(site, 'follower')?.keys).not.toContain('Tab')
   expect(report(site, 'follower')?.color).toBe(1)
+})
+
+test('the preview cursor follows the website under the pointer', async ({
+  runtime,
+  site,
+  messages,
+}) => {
+  const boxes = await ready(site)
+  const at = async (name: string, x: (box: { x: number; width: number }) => number) => {
+    const box = boxes[name]
+    if (!box) throw new Error(`${name} missing`)
+    const input = { kind: 'move' as const, x: x(box), y: box.y + box.height / 2 }
+    await runtime.execute({ type: 'input', paneId: 'source', input })
+    await settle(100)
+    return cursors(messages, 'source').at(-1)
+  }
+  const middle = (box: { x: number; width: number }) => box.x + box.width / 2
+  expect(await at('todo', middle)).toBe('text')
+  expect(await at('link', middle)).toBe('pointer')
+  // A `url()` cursor shows its keyword fallback.
+  expect(await at('grab', middle)).toBe('grab')
+  expect(await at('size', middle)).toBe('default')
+  expect(await at('prose', (box) => box.x + 10)).toBe('text')
+  expect(await at('prose', (box) => box.x + box.width - 10)).toBe('default')
+  expect(await at('a', middle)).toBe('default')
+  // Each frame reports its own cursor; leaving a frame restores the document's.
+  expect(await at('prose', (box) => box.x + 10)).toBe('text')
+  // Playwright's Firefox delivers no synthetic mouse moves inside iframes.
+  if (test.info().project.metadata.engine !== 'firefox')
+    expect(await at('frame', (box) => box.x + 20)).toBe('default')
+  expect(await at('prose', (box) => box.x + 10)).toBe('text')
 })

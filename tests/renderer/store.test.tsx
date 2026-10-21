@@ -226,3 +226,13 @@ test('keeps a second dialog from the same pane until each one resolves', () => {
   receive({ type: 'dialog', paneId: 'pane', dialog: null, dialogId: 'a' })
   expect(store.root().dialog).toBeNull()
 })
+
+test('replays the last website cursor to a remounted canvas', () => {
+  const seen: string[] = []
+  receive({ type: 'cursor', paneId: 'cursor-pane', cursor: 'pointer' })
+  const first = store.subscribeCursor('cursor-pane', (cursor) => seen.push(cursor))
+  receive({ type: 'cursor', paneId: 'cursor-pane', cursor: 'text' })
+  first()
+  store.subscribeCursor('cursor-pane', (cursor) => seen.push(`again:${cursor}`))()
+  expect(seen).toEqual(['pointer', 'text', 'again:text'])
+})
