@@ -68,7 +68,7 @@ Agents can't run arbitrary JavaScript. An action whose target is missing or matc
 ```sh
 panelab devices --search pixel
 panelab shot localhost:3000 -d iphone-16 -d pixel-7 --out shots
-panelab scan localhost:3000 -d iphone-16 -d macbook-air-13 -e webkit,chromium
+panelab scan localhost:3000 -d iphone-16@webkit -d macbook-air-13 -e webkit,chromium
 panelab inspect localhost:3000 '.hero h1' -d iphone-16 -e webkit,chromium --synthetic
 panelab read localhost:3000 -d iphone-16 --within main --limit 50
 panelab act localhost:3000 click 'button[aria-label="Menu"]' -d iphone-16
