@@ -100,7 +100,7 @@ Without the app running, the CLI and MCP server run their own headless previews.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Read [AGENTS.md](AGENTS.md) for the codebase rules and [docs/development.md](docs/development.md) for setup. Run `pnpm check`, `pnpm typecheck`, and the tests for the area you changed before opening a pull request.
+Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the PR and release process, [AGENTS.md](AGENTS.md) for the codebase rules, and [docs/development.md](docs/development.md) for setup. Run `pnpm check`, `pnpm typecheck`, and the tests for the area you changed before opening a pull request.
 
 ### Run from source
 

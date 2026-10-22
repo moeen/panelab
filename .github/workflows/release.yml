@@ -13,10 +13,11 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish
+    name: Build release draft
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,13 +29,12 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Check the tag matches package.json
-        run: |
-          version="v$(node -p "require('./package.json').version")"
-          if [ "$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
+      - name: Check the version and reviewed release notes
+        run: node scripts/release.ts check "$GITHUB_REF_NAME"
+      - name: Require successful main CI for the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release.ts ci "$GITHUB_SHA"
       - run: pnpm check
       - name: Build unsigned app
         run: pnpm dist
@@ -47,7 +47,9 @@ jobs:
         env:
           PANELAB_UPDATE_SIGNING_KEY: ${{ secrets.PANELAB_UPDATE_SIGNING_KEY }}
         run: node scripts/sign-update.ts dist/SHA256SUMS.txt
-      - name: Publish GitHub release
+      - name: Verify updater artifacts
+        run: node scripts/release.ts verify "$GITHUB_REF_NAME" dist
+      - name: Create GitHub release draft
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt dist/SHA256SUMS.txt.sig --title "PaneLab $GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" "dist/PaneLab-${GITHUB_REF_NAME#v}-arm64.zip" dist/SHA256SUMS.txt dist/SHA256SUMS.txt.sig --draft --title "PaneLab $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" --verify-tag --latest=false

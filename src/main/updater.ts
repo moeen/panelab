@@ -1,14 +1,12 @@
-import { createHash, createPublicKey, verify } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
-import { access, chmod, lstat, open, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, open, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import type { ActionResult, AppCommand, UpdateStatus } from '../shared/contracts'
+import { maxDownload, repository, signedChecksum, verifiedBundle } from './update-verify'
 
-export const repository = 'https://github.com/moeen/panelab'
 const latestRelease = 'https://api.github.com/repos/moeen/panelab/releases/latest'
-const bundleId = 'dev.panelab.app'
-const maxDownload = 1024 * 1024 * 1024
 // A download that receives nothing for this long is treated as stalled so the person can retry.
 const stallMs = 30_000
 const dayMs = 24 * 60 * 60 * 1000
@@ -225,17 +223,12 @@ export class Updater {
     this.set({ state: 'downloading', progress: 0, error: null })
     const base = `${repository}/releases/download/v${version}`
     const asset = `PaneLab-${version}-arm64.zip`
-    const sums = Buffer.from(await this.text(`${base}/SHA256SUMS.txt`))
-    const signature = Buffer.from((await this.text(`${base}/SHA256SUMS.txt.sig`)).trim(), 'base64')
-    const key = createPublicKey({
-      key: Buffer.from(this.deps.publicKey, 'base64'),
-      format: 'der',
-      type: 'spki',
-    })
-    if (!verify(null, sums, key, signature))
-      throw new Error('The update signature is invalid. It was not installed.')
-    const expected = checksum(sums.toString('utf8'), asset)
-    if (!expected) throw new Error('The update checksum is missing. It was not installed.')
+    const expected = signedChecksum(
+      Buffer.from(await this.text(`${base}/SHA256SUMS.txt`)),
+      await this.text(`${base}/SHA256SUMS.txt.sig`),
+      this.deps.publicKey,
+      asset,
+    )
 
     const directory = this.deps.directory
     const archive = join(directory, asset)
@@ -276,20 +269,7 @@ export class Updater {
 
     await this.deps.run('/usr/bin/ditto', ['-x', '-k', archive, staged])
     await rm(archive, { force: true })
-    const entries = (await readdir(staged)).filter((name) => name !== '__MACOSX')
-    const app = join(staged, 'PaneLab.app')
-    if (entries.length !== 1 || entries[0] !== 'PaneLab.app' || (await lstat(app)).isSymbolicLink())
-      throw new Error('The update archive is not a PaneLab build.')
-    const plist = join(app, 'Contents', 'Info.plist')
-    const read = (key: string) =>
-      this.deps
-        .run('/usr/bin/plutil', ['-extract', key, 'raw', '-o', '-', plist])
-        .then((value) => value.trim())
-    if (
-      (await read('CFBundleIdentifier')) !== bundleId ||
-      (await read('CFBundleShortVersionString')) !== version
-    )
-      throw new Error('The update archive is not the expected PaneLab version.')
+    const app = await verifiedBundle(staged, version, this.deps.run)
     await this.deps.run('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', app]).catch(() => '')
     this.set({ state: 'ready', progress: 1 })
   }
@@ -320,13 +300,6 @@ export function newer(candidate: string, current: string): boolean {
     if (difference) return difference > 0
   }
   return false
-}
-export function checksum(sums: string, file: string): string | null {
-  for (const line of sums.split('\n')) {
-    const match = /^([a-f\d]{64}) [ *](.+)$/.exec(line.trim())
-    if (match?.[2] === file) return match[1] ?? null
-  }
-  return null
 }
 function message(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message.slice(0, 300) : fallback

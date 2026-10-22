@@ -46,7 +46,8 @@ import { rendererAsset } from './protocol'
 import { SettingsService } from './settings'
 import { WorkspaceStore } from './store'
 import { updatePublicKey } from './update-key'
-import { repository, Updater } from './updater'
+import { repository } from './update-verify'
+import { Updater } from './updater'
 
 const directory = fileURLToPath(new URL('.', import.meta.url))
 protocol.registerSchemesAsPrivileged([

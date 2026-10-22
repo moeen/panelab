@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { checksum, installScript, newer, Updater, type UpdaterDeps } from '../../src/main/updater'
+import { checksum } from '../../src/main/update-verify'
+import { installScript, newer, Updater, type UpdaterDeps } from '../../src/main/updater'
 import type { UpdateStatus } from '../../src/shared/contracts'
 
 const exec = promisify(execFile)

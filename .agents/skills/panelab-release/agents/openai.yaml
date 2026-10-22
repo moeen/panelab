@@ -1,0 +1,4 @@
+interface:
+  display_name: "PaneLab Release"
+  short_description: "Run consistent, verified PaneLab release cycles"
+  default_prompt: "Use $panelab-release to prepare the next PaneLab release."

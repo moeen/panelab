@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
+import manifest from '../../package.json' with { type: 'json' }
 import { clientPath, clientSnippet, installClaudeCode, installClient } from '../core/clients'
 import { type ConnectMode, connectLab } from '../core/connect'
 import {
@@ -183,7 +184,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     io.out(json ? JSON.stringify(value, null, 2) : text)
   const [command, ...rest] = positionals
   if (values.version) {
-    io.out('0.3.2')
+    io.out(manifest.version)
     return exitCodes.ok
   }
   if (values.help || !command) {

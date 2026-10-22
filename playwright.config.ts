@@ -28,6 +28,9 @@ export default defineConfig({
       metadata: { engine: 'firefox' },
     },
     { name: 'electron', testMatch: 'e2e/**/*.spec.ts', testIgnore: '**/*.native.spec.ts' },
+    ...(process.env.PANELAB_TEST_BUNDLE
+      ? [{ name: 'packaged', testMatch: 'packaged/**/*.spec.ts' }]
+      : []),
     ...(process.env.PANELAB_NATIVE_TESTS === '1'
       ? [{ name: 'native', testMatch: 'e2e/**/*.native.spec.ts' }]
       : []),
