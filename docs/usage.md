@@ -152,7 +152,7 @@ Click a preview to send it keyboard input, and press Escape to give keys like Sp
 ## Emulation limits
 
 - Emulation sets geometry and browser identity. It doesn't reproduce the operating system, so fonts, codecs, hardware features, browser chrome, and client hints can differ from a real device. Check on hardware when that matters.
-- Previews are streamed screencast frames. WebKit runs at up to about 25 fps. Hidden and minimized previews pause capture while the page keeps running.
+- Previews are streamed screencast frames. Chromium runs at up to 60 fps, WebKit about 35 fps, and Firefox about 20 fps. When the canvas falls behind, older frames are dropped so a preview always shows its newest paint. Hidden and minimized previews pause capture while the page keeps running.
 - Frames are CSS-pixel JPEGs. When a Chromium or WebKit preview is idle for about 250ms and shown above 1×, PaneLab swaps in a device-pixel PNG so text stays sharp. Firefox keeps CSS-pixel frames.
 - Mouse, keyboard, touch taps, and scrolling are forwarded. Touch drags approximate scrolling. Over a desktop preview the pointer takes the website's cursor (hand, I-beam, resize, and so on); custom image cursors show their keyword fallback, and touch devices show a touch-point circle like Chrome's device mode. Text from non-US layouts is typed as text. Native pinch and swipe gestures and full IME composition aren't supported; committed text is.
 - The canvas doesn't expose the page's accessibility tree, so PaneLab isn't a screen-reader testing tool.

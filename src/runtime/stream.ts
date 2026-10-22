@@ -2,7 +2,9 @@ import type { Page } from 'playwright'
 import type { FrameMessage } from '../shared/contracts'
 
 const acknowledgementTimeoutMs = 1200
-const liveQuality = 95
+// Live frames are replaced by a lossless capture once a pane is idle, so motion trades detail for
+// frames about half the size of quality 95.
+const liveQuality = 80
 // Every engine screencasts CSS-pixel frames, so an idle pane gets a lossless device-pixel screenshot.
 const sharpenDelayMs = 250
 // Screenshots make engines repaint unchanged pages; those echo frames are held for a short window.
@@ -11,15 +13,22 @@ const quietMs = 1500
 export type Capture = { visible: boolean; width: number; height: number }
 type Source = { page: Page | null; active: boolean; variant: number }
 type ScreencastFrame = { data: Buffer; viewportWidth: number; viewportHeight: number }
+type Outgoing = ScreencastFrame & { page: Page; mime: FrameMessage['mime'] }
 
-// Streams one pane's screencast with at most one unacknowledged frame in flight.
+// Streams one pane's screencast with at most one unacknowledged frame in flight. Screencast
+// callbacks return at once so engines keep painting; frames waiting on an acknowledgement
+// collapse into the newest one.
 export class FrameStream {
   capture: Capture = { visible: true, width: 1200, height: 900 }
   private tail: Promise<unknown> = Promise.resolve()
   private key: string | null = null
   private epoch = crypto.randomUUID()
   private sequence = 0
+  // The delivered frame awaiting the renderer's acknowledgement.
   private pending: { sequence: number; resolve: () => void } | null = null
+  // The newest frame waiting for that acknowledgement, and whether a flush loop is running.
+  private queued: Outgoing | null = null
+  private sending = false
   private timer: ReturnType<typeof setTimeout> | undefined
   private quietUntil = 0
   // Input keeps a pane live: a sharpen screenshot mid-gesture would stall it and hold its frames.
@@ -45,6 +54,7 @@ export class FrameStream {
     this.pending?.resolve()
   }
   invalidate(): void {
+    this.queued = null
     this.release()
     this.key = null
   }
@@ -61,24 +71,28 @@ export class FrameStream {
         this.activity()
         this.held = null
         this.shown = null
+        this.queued = null
+        // A new epoch first, so frames the stopping screencast still emits are dropped.
+        const epoch = crypto.randomUUID()
+        this.epoch = epoch
         this.release()
         if (live) await live.screencast.stop().catch(() => {})
         this.key = null
         if (!key || !live) return
-        this.epoch = crypto.randomUUID()
         // ponytail: Firefox screencasts poll screenshots continuously, so a page never looks idle to sharpen.
         const sharpens = live.context().browser()?.browserType().name() !== 'firefox'
         await live.screencast.start({
           size: { width, height },
           quality: liveQuality,
-          onFrame: async (frame) => {
+          onFrame: (frame) => {
+            if (epoch !== this.epoch) return
             if (Date.now() < this.quietUntil) {
               this.held = frame
               return
             }
             this.held = null
             clearTimeout(this.timer)
-            await this.show(live, frame)
+            this.post(live, frame, 'image/jpeg')
             if (sharpens && width > frame.viewportWidth * 1.1)
               this.scheduleSharpen(live, key, sharpenDelayMs)
           },
@@ -87,17 +101,27 @@ export class FrameStream {
       })
     return this.tail
   }
-  private async show(page: Page, frame: ScreencastFrame): Promise<void> {
-    if (
-      await this.deliver(page, frame.data, 'image/jpeg', frame.viewportWidth, frame.viewportHeight)
-    )
-      this.shown = frame.data
+  private post(page: Page, frame: ScreencastFrame, mime: FrameMessage['mime']): void {
+    this.queued = { ...frame, page, mime }
+    if (!this.sending) void this.flush().catch(() => {})
+  }
+  private async flush(): Promise<void> {
+    this.sending = true
+    try {
+      while (this.queued) {
+        const frame = this.queued
+        this.queued = null
+        if ((await this.deliver(frame)) && frame.mime === 'image/jpeg') this.shown = frame.data
+      }
+    } finally {
+      this.sending = false
+    }
   }
   private scheduleSharpen(page: Page, key: string, delay: number): void {
     clearTimeout(this.timer)
     this.timer = setTimeout(async () => {
       if (this.key !== key || this.source().page !== page) return
-      if (this.pending || Date.now() - this.activeAt < sharpenDelayMs)
+      if (this.sending || Date.now() - this.activeAt < sharpenDelayMs)
         return this.scheduleSharpen(page, key, sharpenDelayMs)
       const sequence = this.sequence
       const activeAt = this.activeAt
@@ -109,7 +133,11 @@ export class FrameStream {
       // A newer screencast frame or input means the page moved on; keep the live frame.
       if (this.activeAt !== activeAt) return this.settle(page, key)
       if (data && viewport && this.key === key && this.sequence === sequence)
-        await this.deliver(page, data, 'image/png', viewport.width, viewport.height)
+        this.post(
+          page,
+          { data, viewportWidth: viewport.width, viewportHeight: viewport.height },
+          'image/png',
+        )
       if (this.activeAt !== activeAt) return this.settle(page, key)
       this.quietUntil = Date.now() + quietMs
       this.timer = setTimeout(() => this.settle(page, key), quietMs)
@@ -122,17 +150,18 @@ export class FrameStream {
     this.held = null
     if (!frame || this.key !== key || this.source().page !== page) return
     if (this.shown?.equals(frame.data)) return
-    void this.show(page, frame).then(() => this.scheduleSharpen(page, key, sharpenDelayMs))
+    this.post(page, frame, 'image/jpeg')
+    this.scheduleSharpen(page, key, sharpenDelayMs)
   }
-  private async deliver(
-    page: Page,
-    data: Buffer,
-    mime: FrameMessage['mime'],
-    viewportWidth: number,
-    viewportHeight: number,
-  ): Promise<boolean> {
+  private async deliver({
+    page,
+    data,
+    mime,
+    viewportWidth,
+    viewportHeight,
+  }: Outgoing): Promise<boolean> {
     const port = this.port()
-    if (!port || this.pending || this.source().page !== page) return false
+    if (!port || this.source().page !== page) return false
     const sequence = ++this.sequence
     const message: FrameMessage = {
       type: 'frame',
