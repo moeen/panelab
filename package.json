@@ -1,7 +1,7 @@
 {
   "name": "panelab",
   "productName": "PaneLab",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Compare websites side by side in real Chromium, WebKit, and Firefox on macOS",
   "license": "MIT",
   "author": "Moein Nemati",
