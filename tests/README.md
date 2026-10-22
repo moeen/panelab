@@ -46,6 +46,13 @@ For a real in-application download smoke check, run `PANELAB_TEST_REAL_DOWNLOAD=
 
 V8 reports are under `coverage/`. They cover execution in Vitest's Node/browser projects. Playwright runs, the browser utility process, and native Electron execution do not contribute to that report, so a zero there can coexist with integration/Electron coverage. No blanket coverage percentage is used as a release gate.
 
-Native OS file-dialog presentation, full IME behavior, physical-device fidelity, long-duration performance, and the packaged `.app` remain outside automated coverage. Temporary website observations provide evidence for canvas input because previews do not expose their remote accessibility trees.
+The opt-in packaged smoke test checks an extracted release app from the matching checkout:
+`PANELAB_TEST_BUNDLE=/absolute/path/PaneLab.app pnpm exec playwright test --project=packaged`.
+It launches the bundle's real executable and `app.asar` with isolated Electron, app data, and
+home directories, update checks and agent access off, and cloned test browsers, then checks that
+all three engines stream visible frames from a local fixture. It swaps in the test encryption
+substitute, so it proves packaging and rendering, not Keychain or update installation.
+
+Native OS file-dialog presentation, full IME behavior, physical-device fidelity, and long-duration performance remain outside automated coverage. Temporary website observations provide evidence for canvas input because previews do not expose their remote accessibility trees.
 
 For a change, run the affected tier first, then `pnpm check`, `pnpm typecheck`, and the production build. Run the full suite when a change crosses process or browser boundaries. Report actual results and unresolved failures; a build alone does not establish live behavior.

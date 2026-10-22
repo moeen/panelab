@@ -61,15 +61,6 @@ export const test = base.extend<Fixture>({
     const errors: string[] = []
     const key = randomBytes(32).toString('hex')
     const launch = async () => {
-      const env = Object.fromEntries(
-        Object.entries(process.env).filter(
-          (entry): entry is [string, string] =>
-            typeof entry[1] === 'string' &&
-            !['ELECTRON_RUN_AS_NODE', 'ELECTRON_RENDERER_URL', 'PANELAB_DATA_DIR'].includes(
-              entry[0],
-            ),
-        ),
-      )
       const app = await _electron.launch({
         executablePath:
           typeof electronPath === 'string'
@@ -79,7 +70,7 @@ export const test = base.extend<Fixture>({
         cwd: process.cwd(),
         chromiumSandbox: true,
         env: {
-          ...env,
+          ...isolatedEnv(),
           PANELAB_DATA_DIR: directory,
           PANELAB_TEST_SESSION_KEY: key,
           PANELAB_TEST_NATIVE: info.project.name === 'native' ? '1' : '0',
@@ -133,14 +124,11 @@ export const test = base.extend<Fixture>({
             `Could not collect Electron diagnostics: ${error instanceof Error ? error.message : String(error)}`,
           )
         } finally {
-          try {
-            await app.close()
-          } catch (error) {
+          await close(app).catch((error: unknown) =>
             errors.push(
               `Electron cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
-            )
-            if (child.exitCode === null) child.kill()
-          }
+            ),
+          )
         }
       }
       expect(errors, 'Unexpected Electron renderer/startup errors').toEqual([])
@@ -150,7 +138,30 @@ export const test = base.extend<Fixture>({
     await use(await launch())
   },
 })
-async function seedBrowsers(directory: string): Promise<void> {
+// The app under test must not inherit a developer's Electron or PaneLab overrides.
+export function isolatedEnv(excluded: string[] = []): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' &&
+        ![
+          'ELECTRON_RUN_AS_NODE',
+          'ELECTRON_RENDERER_URL',
+          'PANELAB_DATA_DIR',
+          ...excluded,
+        ].includes(entry[0]),
+    ),
+  )
+}
+export async function close(app: ElectronApplication): Promise<void> {
+  const child = app.process()
+  try {
+    await app.close()
+  } finally {
+    if (child.exitCode === null) child.kill()
+  }
+}
+export async function seedBrowsers(directory: string): Promise<void> {
   for (const browser of [chromium, webkit, firefox]) {
     let source = dirname(browser === chromium ? chromiumShell() : browser.executablePath())
     while (!/^(chromium_headless_shell|webkit|firefox)-\d+$/.test(basename(source))) {

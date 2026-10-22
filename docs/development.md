@@ -48,18 +48,59 @@ pnpm test:native         # opt-in, real macOS Keychain
 
 The [testing guide](../tests/README.md) covers prerequisites, isolation rules, and what each tier proves.
 
-CI runs Biome, the typecheck and build, Vitest, and the three-engine runtime suite on every push and pull request. The Electron and Keychain suites need a desktop session, so run them locally before a release.
+CI runs Biome, the typecheck and build, Vitest, and the three-engine runtime suite on every push and pull request. The Electron and Keychain suites need a desktop session, so [releases](#releases) run them locally.
 
 ## Releases
 
-Bump `version` in `package.json`, commit, then push a matching tag:
+Maintainers release with the [panelab-release skill](../.agents/skills/panelab-release/SKILL.md)
+(also linked under `.claude/skills/`). "Prepare a release" stops at a PR with draft notes;
+"release PaneLab" runs the whole cycle below.
 
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
+`package.json` holds the version for the app, CLI, Lab status, and MCP server. While PaneLab is
+beta, releases are plain `0.x.y`: minor for features or breaking changes, patch for compatible
+fixes and maintenance. The updater ignores prereleases and suffixed versions, so decide
+explicitly before adding a channel or shipping 1.0.
 
-The release workflow checks that the tag matches `package.json`, builds an unsigned arm64 `PaneLab-<version>-arm64.zip`, and publishes it with a `SHA256SUMS.txt` and its Ed25519 signature, `SHA256SUMS.txt.sig`, on GitHub Releases. Builds aren't signed or notarized, so users clear the quarantine flag once (see the README).
+1. Open a `release/vX.Y.Z` PR that bumps `package.json` and adds `docs/releases/vX.Y.Z.md`, filled
+   in from the [release-note template](../.agents/skills/panelab-release/assets/release-notes.md).
+   GitHub receives this file verbatim as the release body.
+2. Run the full routine suite, including Electron, in a desktop session. Run `pnpm test:native`
+   when encryption or native storage changed, and the real download smoke check when engine
+   installation changed.
+3. Squash-merge, then wait for main CI on the merged commit. CI cancels a superseded main run, so
+   if another merge lands first, release the newer commit instead.
+4. Check and tag the merged commit:
+
+   ```sh
+   node scripts/release.ts check vX.Y.Z
+   node scripts/release.ts ci <full-merged-commit-sha>
+   git tag -a vX.Y.Z <full-merged-commit-sha> -m 'PaneLab vX.Y.Z'
+   git push origin refs/tags/vX.Y.Z
+   ```
+
+   The tag workflow repeats both checks, builds the unsigned arm64 `PaneLab-<version>-arm64.zip`,
+   writes and signs `SHA256SUMS.txt`, verifies them with the updater's own checks, and creates a
+   **draft** release. It never publishes.
+5. Download the draft's three assets into an empty temporary directory and verify them from the
+   tagged checkout:
+
+   ```sh
+   node scripts/release.ts verify vX.Y.Z <dir>
+   ditto -x -k <dir>/PaneLab-X.Y.Z-arm64.zip <dir>/unpacked
+   PANELAB_TEST_BUNDLE=<dir>/unpacked/PaneLab.app pnpm exec playwright test --project=packaged
+   ```
+
+   The [testing guide](../tests/README.md) explains what the packaged smoke test proves.
+6. Publish the verified draft, then check the public release, its assets, and that it is latest:
+
+   ```sh
+   gh release edit vX.Y.Z --repo moeen/panelab --draft=false --prerelease=false --latest
+   ```
+
+A missing or failed gate leaves the release as a draft. Published tags and assets are never
+moved or replaced; fix a shipped mistake with a higher version. Builds aren't Apple-signed or
+notarized, so users clear the quarantine flag once (see the README). The Ed25519 signature only
+protects in-app updates.
 
 ### Update signing key
 

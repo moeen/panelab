@@ -5,12 +5,13 @@ import {
   type ToolAnnotations,
 } from '@modelcontextprotocol/server'
 import { z } from 'zod'
+import manifest from '../../package.json' with { type: 'json' }
 import { actActions, type LabApi } from '../shared/agent'
 import { requestTypes } from '../shared/diagnostics'
 import { mediaSchema } from '../shared/emulation'
 import { engines } from '../shared/engines'
 
-export const serverVersion = '0.3.2'
+export const serverVersion = manifest.version
 
 const instructions = `PaneLab renders one website in real Chromium, WebKit, and Firefox previews with device emulation.
 Workflow: open_preview (url + devices + engines) → screenshot or scan_findings → inspect_element on a reported selector → edit the code → reload → screenshot/visual_diff to verify.

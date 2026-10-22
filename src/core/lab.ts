@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
+import manifest from '../../package.json' with { type: 'json' }
 import {
   type ActReport,
   type DeviceSummary,
@@ -124,7 +125,7 @@ export class Lab implements LabApi {
   private handlers: Handlers = {
     status: async () => ({
       mode: this.mode,
-      version: '0.3.2',
+      version: manifest.version,
       engines: this.backend.available(),
       panes: await this.summaries(),
     }),
