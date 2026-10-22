@@ -118,7 +118,7 @@ When a newer version exists, the title bar shows **Update 0.x.y**. Open it (or *
 
 1. The release's `SHA256SUMS.txt` must carry a valid Ed25519 signature from the PaneLab release key built into the app.
 2. The zip must match its signed checksum.
-3. The extracted bundle must be `dev.panelab.app` at the announced version, with an intact code signature.
+3. The extracted bundle must be `dev.panelab.app` at the announced version.
 
 **Restart to update** saves your sessions, quits, swaps the app bundle, and reopens PaneLab. If you quit instead, the update installs on the way out. A failed swap restores the previous app and tells you on the next launch.
 

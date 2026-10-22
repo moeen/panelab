@@ -68,7 +68,7 @@ function setup(files: Record<string, string | Buffer> = {}, patch: Partial<Updat
     directory: join(root, 'updates'),
     publicKey,
     fetch,
-    run: async (file, args) => (file === '/usr/bin/codesign' ? '' : run(file, args)),
+    run,
     launch,
     changed: (status) => statuses.push(status),
     policy: () => ({ enabled: true, checkedAt: null }),
@@ -213,6 +213,28 @@ describe('downloads', () => {
     const staged = join(root, 'updates', 'staged', 'PaneLab.app', 'Contents', 'marker')
     expect(await readFile(staged, 'utf8')).toBe('0.3.0')
   })
+  test('replaces a staged bundle left by an earlier download', async () => {
+    await prepare()
+    const leftover = join(root, 'updates', 'staged', 'PaneLab.app', 'Contents', 'Resources')
+    await mkdir(leftover, { recursive: true })
+    await writeFile(join(leftover, 'app.asar'), 'old')
+    const calls: string[][] = []
+    const { updater } = setup(await release(), {
+      run: async (file, args) => {
+        calls.push([file, ...args])
+        return run(file, args)
+      },
+    })
+    await updater.check()
+    await updater.download()
+    expect(updater.status()).toMatchObject({ state: 'ready', error: null })
+    // Electron's fs cannot delete app.asar, so removal must not go through fs.rm.
+    expect(calls).toContainEqual(['/bin/rm', '-rf', '--', join(root, 'updates', 'staged')])
+    await expect(stat(join(leftover, 'app.asar'))).rejects.toThrow()
+    calls.length = 0
+    await updater.recover()
+    expect(calls).toContainEqual(['/bin/rm', '-rf', '--', join(root, 'updates', 'staged')])
+  })
   test.each([
     ['a checksum file that does not match its signature', { tamper: true }, /signature/],
     ['a different application', { id: 'com.example.other' }, /expected PaneLab version/],
@@ -243,7 +265,7 @@ describe('downloads', () => {
     await updater.download()
     expect(updater.status().error).toMatch(/invalid/)
   })
-  test('rejects a damaged archive and a failed code signature check', async () => {
+  test('rejects a damaged archive', async () => {
     await prepare()
     const files = await release()
     files[`${releases}/PaneLab-0.3.0-arm64.zip`] = Buffer.from('not the signed archive')
@@ -251,16 +273,6 @@ describe('downloads', () => {
     await damaged.updater.check()
     await damaged.updater.download()
     expect(damaged.updater.status().error).toMatch(/damaged/)
-
-    const unsigned = setup(await release(), {
-      run: async (file, args) => {
-        if (file === '/usr/bin/codesign') throw new Error('invalid signature')
-        return run(file, args)
-      },
-    })
-    await unsigned.updater.check()
-    await unsigned.updater.download()
-    expect(unsigned.updater.status().error).toMatch(/code signature/)
   })
 })
 

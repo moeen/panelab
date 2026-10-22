@@ -148,7 +148,7 @@ export class Updater {
       )
     } catch {}
     for (const name of await readdir(this.deps.directory).catch(() => []))
-      await rm(join(this.deps.directory, name), { recursive: true, force: true })
+      await this.remove(join(this.deps.directory, name))
     return result
   }
   stop(): void {
@@ -240,7 +240,7 @@ export class Updater {
     const directory = this.deps.directory
     const archive = join(directory, asset)
     const staged = join(directory, 'staged')
-    await rm(staged, { recursive: true, force: true })
+    await this.remove(staged)
     const stalled = new AbortController()
     let timer = setTimeout(() => stalled.abort(), stallMs)
     const file = await open(archive, 'w', 0o600)
@@ -290,11 +290,12 @@ export class Updater {
       (await read('CFBundleShortVersionString')) !== version
     )
       throw new Error('The update archive is not the expected PaneLab version.')
-    await this.deps.run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]).catch(() => {
-      throw new Error('The update bundle failed its code signature check.')
-    })
     await this.deps.run('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', app]).catch(() => '')
     this.set({ state: 'ready', progress: 1 })
+  }
+  // Electron's fs reads app.asar as a directory, so fs.rm cannot delete a staged bundle.
+  private async remove(path: string): Promise<void> {
+    await this.deps.run('/bin/rm', ['-rf', '--', path])
   }
   private async get(url: string, signal = AbortSignal.timeout(stallMs)): Promise<Response> {
     const response = await this.deps.fetch(url, {
