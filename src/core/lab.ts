@@ -124,7 +124,7 @@ export class Lab implements LabApi {
   private handlers: Handlers = {
     status: async () => ({
       mode: this.mode,
-      version: '0.3.1',
+      version: '0.3.2',
       engines: this.backend.available(),
       panes: await this.summaries(),
     }),
